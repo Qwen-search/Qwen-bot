@@ -690,7 +690,7 @@ def tgid_build_txt_report(username, data, queried_by=""):
     # ════════ BAŞLIK ════════
     lines.append(sep)
     lines.append("        🆔 TELEGRAM ID SORGU RAPORU")
-    lines.append("             🔎 gettg.id API")
+    lines.append("             @hackledin")
     lines.append(sep)
     lines.append(f" 🎯 Sorgulanan   : @{username.lstrip('@')}")
     lines.append(f" 👤 Sorgulayan   : {queried_by}")
@@ -827,7 +827,7 @@ def tgid_build_txt_report(username, data, queried_by=""):
 
     # ════════ FOOTER ════════
     lines.append(sep)
-    lines.append(" 📌 Bu rapor gettg.id API'si kullanılarak oluşturuldu.")
+    lines.append(" 📌 Bu rapor @hackledin API'si kullanılarak oluşturuldu.")
     lines.append(" 👨‍💻 Developer : @hackledin")
     lines.append(" 🛡️ Cyber Searcher v4.4")
     lines.append(sep)
