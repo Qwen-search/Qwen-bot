@@ -1,8 +1,9 @@
 # -*- coding: utf-8 -*-
 # ╔══════════════════════════════════════════════════════════╗
-# ║         CYBER SEARCHER v4.2 — FULL PRODUCTION           ║
+# ║         CYBER SEARCHER v4.3 — FULL PRODUCTION           ║
 # ║              Developer: @hackledin                       ║
 # ║  🎵 Müzik + 🎥 Video (POT ile Bot Koruması Aşıldı)      ║
+# ║  🤖 Alt Bot Desteği (Düzeltildi)                        ║
 # ╚══════════════════════════════════════════════════════════╝
 import telebot
 import requests
@@ -23,8 +24,8 @@ from random import choice, randint
 from string import ascii_lowercase
 from urllib.parse import quote
 from telebot.types import (
-InlineKeyboardMarkup, InlineKeyboardButton,
-ReplyKeyboardMarkup, KeyboardButton, LabeledPrice
+    InlineKeyboardMarkup, InlineKeyboardButton,
+    ReplyKeyboardMarkup, KeyboardButton, LabeledPrice
 )
 from yt_dlp import YoutubeDL
 import yt_dlp
@@ -63,11 +64,9 @@ SMS_COUNT = 41
 # ══════════════════════════════════════════════════════════════
 #  YT-DLP POT (Proof-of-Origin Token) PROVIDER AYARI
 # ══════════════════════════════════════════════════════════════
-# Dockerfile'da çalışan POT sunucusu adresi
 POT_PROVIDER_URL = "http://127.0.0.1:4416"
 
 def _ytdlp_common_opts():
-    """Tüm yt-dlp çağrılarında kullanılacak ortak ayarlar."""
     return {
         'noplaylist': True,
         'quiet': True,
@@ -76,13 +75,17 @@ def _ytdlp_common_opts():
         'retries': 3,
         'fragment_retries': 3,
         'ignoreerrors': False,
-        # POT sağlayıcı ayarları (bot kontrolünü aşar)
         'extractor_args': {
             'youtubepot-bgutilhttp': {
                 'base_url': [POT_PROVIDER_URL]
             }
         },
     }
+
+# ══════════════════════════════════════════════════════════════
+#  GLOBAL BOT INSTANCE (ANA SÜREÇ İÇİN)
+# ══════════════════════════════════════════════════════════════
+main_bot: Optional[telebot.TeleBot] = None
 
 # ══════════════════════════════════════════════════════════════
 #  DATABASE FUNCTIONS
@@ -625,16 +628,15 @@ def _exif_mesaj_olustur(d: dict) -> str:
     else:
         msg += f"📍 <b>GPS:</b> <code>Konum verisi bulunamadı</code>\n"
         
-    msg += f"{'━' * 28}\n🤖 <i>Cyber Searcher v4.2 | @hackledin</i>"
+    msg += f"{'━' * 28}\n🤖 <i>Cyber Searcher v4.3 | @hackledin</i>"
     return msg
 
 # ══════════════════════════════════════════════════════════════
-#  🎵 MÜZİK İNDİRİCİ (POT PROVIDER İLE BOT KORUMASI AŞILIR)
+#  🎵 MÜZİK İNDİRİCİ
 # ══════════════════════════════════════════════════════════════
 MUSIC_LOCK = threading.Lock()
 
 def _youtube_ara(sorgu: str) -> Optional[str]:
-    """YouTube'da şarkı arar, ilk video URL'sini döndürür."""
     try:
         q = quote(sorgu)
         html = requests.get(
@@ -844,7 +846,7 @@ def _process_music(msg, bot_instance):
             bot_instance.reply_to(msg, f"❌ Hata: `{e}`")
 
 # ══════════════════════════════════════════════════════════════
-#  🎥 VİDEO İNDİRİCİ (POT PROVIDER İLE)
+#  🎥 VİDEO İNDİRİCİ
 # ══════════════════════════════════════════════════════════════
 def _download_video(link):
     os.makedirs("downloads", exist_ok=True)
@@ -1214,7 +1216,7 @@ def s(user_id, key, **kw):
     return txt.format(**kw) if kw else txt
 
 # ══════════════════════════════════════════════════════════════
-#  STRINGS (f-string KULLANILMAMALI!)
+#  STRINGS
 # ══════════════════════════════════════════════════════════════
 S = {
     "tr": {
@@ -1710,7 +1712,7 @@ def premium_kb(user_id):
     return mk
 
 # ══════════════════════════════════════════════════════════════
-#  MULTI-BOT MANAGEMENT
+#  MULTI-BOT MANAGEMENT (DÜZELTİLDİ)
 # ══════════════════════════════════════════════════════════════
 _CHILD_PROCS: dict = {}
 _PROC_LOCK = threading.Lock()
@@ -1732,6 +1734,10 @@ def _save_registry(registry: dict):
         json.dump(registry, f, indent=2)
 
 def _spawn_bot(token: str, owner_id: int = None) -> bool:
+    """
+    Alt botu ayrı bir Python süreci olarak başlatır.
+    Alt süreç, --bot TOKEN --owner ID argümanlarıyla çalışır.
+    """
     if token == BOT_TOKEN:
         print(f"[SPAWN] ⚠️ Ana bot token'ı spawn edilemez!")
         return False
@@ -1745,10 +1751,27 @@ def _spawn_bot(token: str, owner_id: int = None) -> bool:
         python_exe = _get_python_exe()
         args = [python_exe, script_path, "--bot", token, "--owner", str(owner_id)]
         try:
-            proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                    stdin=subprocess.DEVNULL,
-                                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-                                    start_new_session=True)
+            # Alt süreç için ortam değişkenleri ile main_bot'u ayır
+            env = os.environ.copy()
+            env["CYBER_CHILD_MODE"] = "1"
+            env["CYBER_CHILD_TOKEN"] = token
+            env["CYBER_CHILD_OWNER"] = str(owner_id)
+            
+            creationflags = 0
+            if sys.platform == "win32":
+                creationflags = subprocess.CREATE_NO_WINDOW
+            else:
+                creationflags = 0
+                
+            proc = subprocess.Popen(
+                args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=creationflags,
+                start_new_session=True,
+                env=env
+            )
             with _PROC_LOCK:
                 _CHILD_PROCS[token] = proc
             registry = _load_registry()
@@ -2988,7 +3011,7 @@ def _sms_normal_settings(msg, phone, mail, bot_instance):
     _launch_sms_bomb(uid, phone, mail, "normal", limit, interval, bot_instance)
 
 # ══════════════════════════════════════════════════════════════
-#  HOTMAIL CHECKER v4.0
+#  HOTMAIL CHECKER v4.0 (DÜZELTİLDİ - bot_instance taşınıyor)
 # ══════════════════════════════════════════════════════════════
 HOTMAIL_QUEUE = queue.Queue()
 HOTMAIL_CURRENT_TASK: Optional[dict] = None
@@ -3362,7 +3385,11 @@ def hotmail_check(username, password):
     return result["status"]
 
 def process_hotmail_queue():
-    global HOTMAIL_CURRENT_TASK, HOTMAIL_QUEUE_RUNNING, main_bot
+    """
+    DÜZELTİLDİ: Artık bot_instance'ı HOTMAIL_CURRENT_TASK içinden alıyor.
+    Alt bot süreçleri de kendi bot_instance'larını kullanabiliyor.
+    """
+    global HOTMAIL_CURRENT_TASK, HOTMAIL_QUEUE_RUNNING
     global HOTMAIL_HIT, HOTMAIL_BAD, HOTMAIL_ERROR, HOTMAIL_2FA, HOTMAIL_REWARDS
     global HOTMAIL_KEYWORD_HITS, HOTMAIL_COUNTRY_HITS, HOTMAIL_START_TIME
     
@@ -3381,6 +3408,9 @@ def process_hotmail_queue():
             HOTMAIL_KEYWORD_HITS = {}
             HOTMAIL_COUNTRY_HITS = {}
             
+            # Task içinden bot_instance'ı al
+            bot_instance = task.bot_instance if hasattr(task, 'bot_instance') else main_bot
+            
             with HOTMAIL_QUEUE_LOCK:
                 HOTMAIL_CURRENT_TASK = {
                     "user_id": task.user_id,
@@ -3389,14 +3419,15 @@ def process_hotmail_queue():
                     "is_premium": task.is_premium,
                     "chat_id": task.chat_id,
                     "status_msg_id": task.status_msg_id,
-                    "keywords": task.keywords
+                    "keywords": task.keywords,
+                    "bot_instance": bot_instance
                 }
                 
             print(f"\n🚀 HOTMAIL TARAMA BAŞLADI | {task.user_name} | {len(task.combo_list)} satır")
             
             try:
-                if main_bot:
-                    main_bot.edit_message_text(
+                if bot_instance:
+                    bot_instance.edit_message_text(
                         f"🚀 **Hotmail Checker Başladı!**\n"
                         f"👤 {task.user_name}\n"
                         f"📂 Toplam: {len(task.combo_list)} satır\n"
@@ -3429,10 +3460,10 @@ def process_hotmail_queue():
                             
                         if processed % 10 == 0 or processed == total:
                             try:
-                                if main_bot:
+                                if bot_instance:
                                     elapsed = int(time.time() - HOTMAIL_START_TIME)
                                     cpm = int(processed / (elapsed / 60)) if elapsed > 0 else 0
-                                    main_bot.edit_message_text(
+                                    bot_instance.edit_message_text(
                                         f"🚀 **Hotmail Checker Çalışıyor**\n"
                                         f"👤 {task.user_name}\n"
                                         f"📂 İlerleme: {processed}/{total} (%{int(processed/total*100)})\n"
@@ -3490,12 +3521,12 @@ def process_hotmail_queue():
             result_text = "\n".join(result_lines)
             
             try:
-                if main_bot:
-                    main_bot.edit_message_text(result_text, task.chat_id, task.status_msg_id)
+                if bot_instance:
+                    bot_instance.edit_message_text(result_text, task.chat_id, task.status_msg_id)
                     hit_file = f"hits_{task.user_id}.txt"
                     if os.path.exists(hit_file) and os.path.getsize(hit_file) > 0:
                         with open(hit_file, "rb") as f:
-                            main_bot.send_document(
+                            bot_instance.send_document(
                                 task.chat_id, f,
                                 caption=f"✅ {HOTMAIL_HIT}x Hotmail Hit\n📊 Toplam Hit: {HOTMAIL_HIT}"
                             )
@@ -3521,19 +3552,22 @@ def start_queue_processor():
     HOTMAIL_QUEUE_THREAD = threading.Thread(target=process_hotmail_queue, daemon=True)
     HOTMAIL_QUEUE_THREAD.start()
 
-def add_to_queue(task: HotmailTask):
+def add_to_queue(task: HotmailTask, bot_instance):
+    """DÜZELTİLDİ: bot_instance parametre olarak alınıyor."""
     with HOTMAIL_QUEUE_LOCK:
         position = HOTMAIL_QUEUE.qsize() + 1
         if HOTMAIL_CURRENT_TASK:
             position += 1
         task.queue_position = position
+        # bot_instance'ı task'a ekle
+        task.bot_instance = bot_instance
         HOTMAIL_QUEUE.put(task)
         
         try:
-            if main_bot:
+            if bot_instance:
                 is_prem = task.is_premium
                 limit_text = f"{PREMIUM_CHECK_LIMIT}" if is_prem else f"{FREE_CHECK_LIMIT}"
-                main_bot.send_message(
+                bot_instance.send_message(
                     task.chat_id,
                     f"🚀 **Hotmail taraması sıraya alınıyor...**\n"
                     f"⏳ **Sıraya Alındınız! Sıra Numaranız:** {position}\n"
@@ -3625,7 +3659,7 @@ def _start_hotmail_scan_queue(msg, combo_list, bot_instance):
         is_premium=is_prem,
         keywords=keywords
     )
-    add_to_queue(task)
+    add_to_queue(task, bot_instance)
 
 def get_queue_status_text(user_id: int = None) -> str:
     with HOTMAIL_QUEUE_LOCK:
@@ -3653,14 +3687,14 @@ def get_queue_status_text(user_id: int = None) -> str:
         return "\n".join(lines)
 
 # ══════════════════════════════════════════════════════════════
-#  HANDLER FUNCTIONS
+#  HANDLER FUNCTIONS (DÜZELTİLDİ)
 # ══════════════════════════════════════════════════════════════
-main_bot = None
-
 def register_handlers(bot_instance):
-    global main_bot
-    main_bot = bot_instance
-
+    """
+    DÜZELTİLDİ: Artık global main_bot'u değiştirmiyor, sadece
+    verilen bot_instance üzerinden handler'ları kaydediyor.
+    """
+    
     @bot_instance.message_handler(commands=["start"])
     def cmd_start(msg):
         uid = msg.from_user.id
@@ -5511,35 +5545,61 @@ def _admin_announce(msg, bot_instance):
     )
 
 # ══════════════════════════════════════════════════════════════
-#  MAIN
+#  MAIN (DÜZELTİLDİ)
 # ══════════════════════════════════════════════════════════════
 if __name__ == "__main__":
+    # Alt süreç modu kontrolü
     child_mode = False
     child_token = None
+    owner_id = None
+    
+    # Argümanlardan veya ortam değişkenlerinden oku
     argv = sys.argv[1:]
     for i, arg in enumerate(argv):
         if arg == "--bot" and i + 1 < len(argv):
             child_mode = True
             child_token = argv[i + 1]
-            
+        elif arg == "--owner" and i + 1 < len(argv):
+            owner_id = argv[i + 1]
+    
+    # Ortam değişkenlerinden de kontrol et
+    if os.environ.get("CYBER_CHILD_MODE") == "1":
+        child_mode = True
+        child_token = os.environ.get("CYBER_CHILD_TOKEN") or child_token
+        owner_id = os.environ.get("CYBER_CHILD_OWNER") or owner_id
+    
     if child_mode and child_token:
         print(f"[CHILD] Starting bot with token: {child_token[:10]}...")
+        print(f"[CHILD] Owner ID: {owner_id}")
+        
+        # Alt bot için ayrı bir TeleBot instance'ı
         child_bot = telebot.TeleBot(child_token, parse_mode="HTML")
+        
+        # Handler'ları child_bot üzerinden kaydet
         register_handlers(child_bot)
+        
+        # Alt bot için main_bot referansını child_bot olarak ayarla
+        # (Hotmail queue gibi thread'ler kendi bot_instance'larını kullanacak)
+        main_bot = child_bot
+        
         print(f"[CHILD] Bot {child_token[:10]}... ready!")
         try:
             child_bot.infinity_polling(timeout=60)
         except Exception as e:
             print(f"[CHILD] Polling error: {e}")
         sys.exit(0)
-        
+    
+    # Ana bot modu
+    print("[MAIN] Starting Cyber Searcher v4.3...")
     main_bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
     register_handlers(main_bot)
-    print("[MAIN] Starting saved bots...")
+    
+    print("[MAIN] Starting saved child bots...")
     start_saved_bots()
+    
     print("""
 ╔══════════════════════════════════════════════════════╗
-║       CYBER SEARCHER v4.2 — PRODUCTION               ║
+║       CYBER SEARCHER v4.3 — PRODUCTION               ║
 ║         Developer: @hackledin                        ║
 ╠══════════════════════════════════════════════════════╣
 ║  ✅ YouTube POT Provider (Bot Koruması Aşıldı)      ║
@@ -5550,12 +5610,14 @@ if __name__ == "__main__":
 ║  ✅ Capture Tool                                     ║
 ║  ✅ SMS Bomber (41+ Servis)                          ║
 ║  ✅ EXIF Metadata                                    ║
+║  ✅ Alt Bot Desteği (Düzeltildi)                    ║
 ║  ✅ Türkçe / English / العربية                       ║
 ╚══════════════════════════════════════════════════════╝
 """)
+    
     while True:
         try:
-            main_bot.polling(none_stop=True, timeout=60)
+            main_bot.infinity_polling(timeout=60)
         except Exception as e:
             print(f"[HATA] {e}")
             time.sleep(5)
