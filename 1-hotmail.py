@@ -3,7 +3,7 @@
 # ║         CYBER SEARCHER v4.3 — FULL PRODUCTION           ║
 # ║              Developer: @hackledin                       ║
 # ║  🎵 Müzik + 🎥 Video (POT ile Bot Koruması Aşıldı)      ║
-# ║  🤖 Alt Bot Desteği (Düzeltildi)                        ║
+# ║  🆔 Telegram ID Sorgu (gettg.id API) — YENİ!            ║
 # ╚══════════════════════════════════════════════════════════╝
 import telebot
 import requests
@@ -24,8 +24,8 @@ from random import choice, randint
 from string import ascii_lowercase
 from urllib.parse import quote
 from telebot.types import (
-    InlineKeyboardMarkup, InlineKeyboardButton,
-    ReplyKeyboardMarkup, KeyboardButton, LabeledPrice
+InlineKeyboardMarkup, InlineKeyboardButton,
+ReplyKeyboardMarkup, KeyboardButton, LabeledPrice
 )
 from yt_dlp import YoutubeDL
 import yt_dlp
@@ -62,6 +62,18 @@ PREMIUM_KEYWORD_LIMIT = 999
 SMS_COUNT = 41
 
 # ══════════════════════════════════════════════════════════════
+#  🆔 TELEGRAM ID SORGU (gettg.id API)
+# ══════════════════════════════════════════════════════════════
+TGID_API_BASE          = "https://www.gettg.id/api/search?username="
+TGID_FREE_LIMIT        = 5
+TGID_PACKAGE_25        = 25
+TGID_PACKAGE_50        = 50
+TGID_PACKAGE_100       = 100
+TGID_PRICE_25          = 89
+TGID_PRICE_50          = 180
+TGID_PRICE_100         = 250
+
+# ══════════════════════════════════════════════════════════════
 #  YT-DLP POT (Proof-of-Origin Token) PROVIDER AYARI
 # ══════════════════════════════════════════════════════════════
 POT_PROVIDER_URL = "http://127.0.0.1:4416"
@@ -81,11 +93,6 @@ def _ytdlp_common_opts():
             }
         },
     }
-
-# ══════════════════════════════════════════════════════════════
-#  GLOBAL BOT INSTANCE (ANA SÜREÇ İÇİN)
-# ══════════════════════════════════════════════════════════════
-main_bot: Optional[telebot.TeleBot] = None
 
 # ══════════════════════════════════════════════════════════════
 #  DATABASE FUNCTIONS
@@ -134,6 +141,32 @@ def db_init():
         password TEXT,
         status TEXT,
         detail TEXT,
+        date TEXT
+    )''')
+    # 🆔 Telegram ID Sorgu tabloları
+    c.execute('''CREATE TABLE IF NOT EXISTS tgid_users (
+        user_id INTEGER PRIMARY KEY,
+        free_used INTEGER DEFAULT 0,
+        query_balance INTEGER DEFAULT 0,
+        total_queries INTEGER DEFAULT 0,
+        tgid_last_query TEXT DEFAULT ''
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS tgid_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT,
+        target TEXT,
+        status TEXT,
+        detail TEXT,
+        date TEXT
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS tgid_purchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT,
+        package TEXT,
+        queries INTEGER,
+        stars INTEGER,
         date TEXT
     )''')
     conn.commit()
@@ -430,6 +463,105 @@ def api_pref(user_id):
         return v if v is not None else 0
     except:
         return 0
+
+# ══════════════════════════════════════════════════════════════
+#  🆔 TELEGRAM ID SORGU - VERİTABANI FONKSİYONLARI
+# ══════════════════════════════════════════════════════════════
+def tgid_init_user(user_id):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO tgid_users (user_id) VALUES (?)", (user_id,))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+def tgid_get(user_id, col):
+    try:
+        tgid_init_user(user_id)
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(f"SELECT {col} FROM tgid_users WHERE user_id=?", (user_id,))
+        r = c.fetchone()
+        conn.close()
+        return r[0] if r else 0
+    except:
+        return 0
+
+def tgid_set(user_id, col, val):
+    try:
+        tgid_init_user(user_id)
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(f"UPDATE tgid_users SET {col}=? WHERE user_id=?", (val, user_id))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+def tgid_get_free_used(user_id):
+    return tgid_get(user_id, "free_used") or 0
+
+def tgid_get_balance(user_id):
+    return tgid_get(user_id, "query_balance") or 0
+
+def tgid_get_total(user_id):
+    return tgid_get(user_id, "total_queries") or 0
+
+def tgid_can_query(user_id):
+    if user_id == ADMIN_ID:
+        return True, "admin"
+    if is_premium(user_id):
+        return True, "premium"
+    free_used = tgid_get_free_used(user_id)
+    if free_used < TGID_FREE_LIMIT:
+        return True, "free"
+    if tgid_get_balance(user_id) > 0:
+        return True, "balance"
+    return False, None
+
+def tgid_use_query(user_id):
+    if user_id == ADMIN_ID or is_premium(user_id):
+        tgid_set(user_id, "total_queries", tgid_get_total(user_id) + 1)
+        return True, "unlimited"
+    free_used = tgid_get_free_used(user_id)
+    if free_used < TGID_FREE_LIMIT:
+        tgid_set(user_id, "free_used", free_used + 1)
+        tgid_set(user_id, "total_queries", tgid_get_total(user_id) + 1)
+        return True, "free"
+    balance = tgid_get_balance(user_id)
+    if balance > 0:
+        tgid_set(user_id, "query_balance", balance - 1)
+        tgid_set(user_id, "total_queries", tgid_get_total(user_id) + 1)
+        return True, "balance"
+    return False, None
+
+def tgid_add_balance(user_id, amount):
+    current = tgid_get_balance(user_id)
+    tgid_set(user_id, "query_balance", current + amount)
+
+def tgid_log_query(user_id, username, target, status, detail=""):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT INTO tgid_logs (user_id,username,target,status,detail,date) VALUES (?,?,?,?,?,?)",
+                  (user_id, username, target, status, detail, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+def tgid_log_purchase(user_id, username, package, queries, stars):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT INTO tgid_purchases (user_id,username,package,queries,stars,date) VALUES (?,?,?,?,?,?)",
+                  (user_id, username, package, queries, stars, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+    except:
+        pass
 
 # ══════════════════════════════════════════════════════════════
 #  📸 EXIF METADATA MODÜLÜ
@@ -1220,7 +1352,7 @@ def s(user_id, key, **kw):
 # ══════════════════════════════════════════════════════════════
 S = {
     "tr": {
-        "welcome": "🌟 <b>Cyber Searcher</b>\nHoşgeldin, <b>{name}</b>!\n📌 Durum: {status}\n🔻 Aşağıdan işlem seç:",
+        "welcome": "🌟 <b>Cyber Searcher v4.3</b>\nHoşgeldin, <b>{name}</b>!\n📌 Durum: {status}\n🔻 Aşağıdan işlem seç:",
         "free": "🆓 Ücretsiz",
         "premium": "⭐ PREMIUM",
         "select_op": "🛠 Kullanmak istediğin aracı seç:",
@@ -1240,7 +1372,7 @@ S = {
         "premium_title": "⭐ <b>PREMIUM ÜYELİK</b>",
         "premium_price_txt": "💰 Fiyat: <b>{price} Telegram Yıldızı</b>",
         "premium_dur": "♾️ Süre: <b>Sınırsız (Ömür Boyu)</b>",
-        "premium_features": "🎯 <b>PREMIUM ÖZELLİKLER</b>\n• 📧 Sınırsız Hotmail Check\n• 📸 Sınırsız Capture (20 Platform)\n• 🔖 Sınırsız Keyword\n• 🌍 Sınırsız OSINT (LeakSights)\n• 📊 Detaylı istatistikler",
+        "premium_features": "🎯 <b>PREMIUM ÖZELLİKLER</b>\n• 📧 Sınırsız Hotmail Check\n• 📸 Sınırsız Capture (20 Platform)\n• 🔖 Sınırsız Keyword\n• 🌍 Sınırsız OSINT (LeakSights)\n• 🆔 Sınırsız Telegram ID Sorgu\n• 📊 Detaylı istatistikler",
         "osint_price": "💰 OSINT Premium: 200 Yıldız",
         "already_premium": "⭐ Zaten Premium üyesiniz!",
         "prem_ok": "🎉 <b>Premium aktif!</b>",
@@ -1293,7 +1425,7 @@ S = {
         "php2py_only": "❌ Sadece PHP dosyası gönder!",
         "php2py_no_token": "❌ API token alınamadı.",
         "help_content": (
-            "📖 **YARDIM MENÜSÜ**\n"
+            "📖 **YARDIM MENÜSÜ (v4.3)**\n"
             "📌 Durumunuz: {status}\n"
             "══════════════════════\n"
             "🔹 **SORGU SİSTEMLERİ** (🆓 ÜCRETSİZ):\n"
@@ -1309,15 +1441,18 @@ S = {
             "   • 🎓 E-Okul Sorgu\n"
             "   • 🏠 Tapu Sorgu\n"
             "   • 🗺️ Ada Parsel Sorgu\n"
-            "   • 🏠 Adres Sorgu (YENİ!) ✅\n"
+            "   • 🏠 Adres Sorgu\n"
+            "🔹 **🆔 TELEGRAM ID SORGU (YENİ!)**:\n"
+            "   • 🆓 Free: 5 sorgu\n"
+            "   • 💰 Bakiye: 25→89⭐ / 50→180⭐ / 100→250⭐\n"
+            "   • ⭐ Premium: Sınırsız\n"
             "🔹 **⭐ PREMIUM PAKETLER:**\n"
-            "   • 🌟 Premium (400 Yıldız) → Sınırsız Hotmail + Capture + Keyword\n"
+            "   • 🌟 Premium (400 Yıldız) → Sınırsız Hotmail + Capture + Keyword + TG-ID\n"
             "   • 🌍 OSINT Premium (200 Yıldız) → LeakSights OSINT (30+ Sorgu)\n"
-            "   • /premium ile satın alabilirsin\n"
             "🔹 **DİĞER ARAÇLAR** (🆓 ÜCRETSİZ):\n"
             "   • 📦 Combo Çekme\n"
-            "   • 🎥 Video İndirme (Sağlam ✅)\n"
-            "   • 🎵 Müzik İndirme (Sağlam ✅)\n"
+            "   • 🎥 Video İndirme ✅\n"
+            "   • 🎵 Müzik İndirme ✅\n"
             "   • 💳 CC Generator\n"
             "   • 🤖 Discord Token Kontrol\n"
             "   • ✈️ Telegram Token Kontrol\n"
@@ -1332,26 +1467,25 @@ S = {
             "   • 📧 Hotmail Checker - Free 3000 satır\n"
             "   • 📸 Capture Tool - Free 3 kullanım\n"
             "   • 📸 EXIF Metadata Analizi ✅\n"
-            "🔹 **PROFİL:**\n"
-            "   • 👤 Profil\n"
-            "   • 📊 İstatistik\n"
-            "   • 🏆 Lider Tablosu\n"
-            "   • ⚙️ API Değiştir\n"
             "👨‍💻 coded by: @hackledin"
         ),
     },
     "en": {
-        "welcome": "🌟 <b>Cyber Searcher</b>\nWelcome, <b>{name}</b>!\n📌 Status: {status}\n🔻 Select an option:",
+        "welcome": "🌟 <b>Cyber Searcher v4.3</b>\nWelcome, <b>{name}</b>!\n📌 Status: {status}\n🔻 Select an option:",
         "free": "🆓 Free",
         "premium": "⭐ PREMIUM",
         "osint_price": "💰 OSINT Premium: 200 Stars",
         "help_content": (
-            "📖 **HELP MENU**\n"
+            "📖 **HELP MENU (v4.3)**\n"
             "📌 Your Status: {status}\n"
             "══════════════════════\n"
             "🔹 **⭐ PREMIUM PACKAGES:**\n"
-            "   • 🌟 Premium (400 Stars) → Unlimited Hotmail + Capture + Keyword\n"
+            "   • 🌟 Premium (400 Stars) → Unlimited Hotmail + Capture + Keyword + TG-ID\n"
             "   • 🌍 OSINT Premium (200 Stars) → LeakSights OSINT (30+ Queries)\n"
+            "🔹 **🆔 TELEGRAM ID QUERY (NEW!)**:\n"
+            "   • 🆓 Free: 5 queries\n"
+            "   • 💰 Balance: 25→89⭐ / 50→180⭐ / 100→250⭐\n"
+            "   • ⭐ Premium: Unlimited\n"
             "🔹 **OTHER TOOLS:**\n"
             "   • 💣 SMS Bomber - 41+ Services ✅\n"
             "   • 📧 Hotmail Checker - Free 3000 lines\n"
@@ -1359,22 +1493,26 @@ S = {
             "   • 📸 EXIF Metadata Analysis ✅\n"
             "   • 🎵 Music Downloader (POT ✅)\n"
             "   • 🎥 Video Downloader (POT ✅)\n"
-            "   • 🌍 LeakSights OSINT - Premium (200⭐)\n"
+            "   • 🆔 Telegram ID Query (gettg.id)\n"
             "👨‍💻 coded by: @hackledin"
         ),
     },
     "ar": {
-        "welcome": "🌟 <b>Cyber Searcher</b>\nمرحباً، <b>{name}</b>!\n📌 الحالة: {status}\n🔻 اختر خياراً:",
+        "welcome": "🌟 <b>Cyber Searcher v4.3</b>\nمرحباً، <b>{name}</b>!\n📌 الحالة: {status}\n🔻 اختر خياراً:",
         "free": "🆓 مجاني",
         "premium": "⭐ بريميوم",
         "osint_price": "💰 OSINT بريميوم: 200 نجمة",
         "help_content": (
-            "📖 **قائمة المساعدة**\n"
+            "📖 **قائمة المساعدة (v4.3)**\n"
             "📌 حالتك: {status}\n"
             "══════════════════════\n"
             "🔹 **⭐ باقات البريميوم:**\n"
-            "   • 🌟 بريميوم (400 نجمة) → غير محدود Hotmail + Capture + Keyword\n"
-            "   • 🌍 OSINT بريميوم (200 نجمة) → LeakSights OSINT (30+ استعلام)\n"
+            "   • 🌟 بريميوم (400 نجمة) → غير محدود Hotmail + Capture + Keyword + TG-ID\n"
+            "   • 🌍 OSINT بريميوم (200 نجمة) → LeakSights OSINT\n"
+            "🔹 **🆔 استعلام ID تيليجرام (جديد!)**:\n"
+            "   • 🆓 مجاني: 5 استعلامات\n"
+            "   • 💰 الرصيد: 25→89⭐ / 50→180⭐ / 100→250⭐\n"
+            "   • ⭐ بريميوم: غير محدود\n"
             "👨‍💻 coded by: @hackledin"
         ),
     },
@@ -1647,6 +1785,7 @@ def tools_kb(user_id):
         _btn("💣 SMS Bomber", "tool_smsbomb"), _btn("📧 Hotmail Checker", "tool_hotmail"),
         _btn("📸 EXIF Metadata", "tool_exif"),
     )
+    mk.add(_btn("🆔 Telegram ID Sorgu", "tool_tgid"))
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
     return mk
 
@@ -1712,7 +1851,290 @@ def premium_kb(user_id):
     return mk
 
 # ══════════════════════════════════════════════════════════════
-#  MULTI-BOT MANAGEMENT (DÜZELTİLDİ)
+#  🆔 TELEGRAM ID SORGU KLAVYELERİ
+# ══════════════════════════════════════════════════════════════
+def tgid_kb(user_id):
+    mk = InlineKeyboardMarkup(row_width=1)
+    free_left = max(0, TGID_FREE_LIMIT - tgid_get_free_used(user_id))
+    balance   = tgid_get_balance(user_id)
+
+    if user_id == ADMIN_ID:
+        durum = "👑 Admin — Sınırsız Sorgu"
+    elif is_premium(user_id):
+        durum = "⭐ Premium — Sınırsız Sorgu"
+    else:
+        durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
+
+    mk.add(_btn(f"📊 {durum}", "noop"))
+    mk.add(_btn("🔍 Sorgu Yap", "tgid_search"))
+    mk.add(_btn("💎 Paket Satın Al", "tgid_packages"))
+    mk.add(_btn("📊 İstatistiklerim", "tgid_my_stats"))
+    mk.add(_btn("◀️ Geri", "goto_tools"))
+    return mk
+
+def tgid_packages_kb():
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(_btn(f"💎 {TGID_PACKAGE_25} Sorgu — {TGID_PRICE_25} ⭐", "tgid_buy_25"))
+    mk.add(_btn(f"💎 {TGID_PACKAGE_50} Sorgu — {TGID_PRICE_50} ⭐", "tgid_buy_50"))
+    mk.add(_btn(f"💎 {TGID_PACKAGE_100} Sorgu — {TGID_PRICE_100} ⭐", "tgid_buy_100"))
+    mk.add(_btn("◀️ Geri", "tool_tgid"))
+    return mk
+
+# ══════════════════════════════════════════════════════════════
+#  🆔 TELEGRAM ID SORGU - API + RAPOR
+# ══════════════════════════════════════════════════════════════
+def tgid_api_search(username):
+    try:
+        username = username.strip().lstrip("@")
+        if not username:
+            return False, "❌ Kullanıcı adı boş olamaz!"
+        if len(username) < 3:
+            return False, "❌ Kullanıcı adı en az 3 karakter olmalı!"
+        url = TGID_API_BASE + username
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
+        }
+        r = requests.get(url, headers=headers, timeout=20, verify=False)
+        if r.status_code != 200:
+            return False, f"❌ API Hatası: HTTP {r.status_code}"
+        try:
+            outer = r.json()
+        except:
+            return False, f"❌ API geçersiz cevap:\n{r.text[:300]}"
+        if outer.get("durum") == "başarı":
+            inner_raw = outer.get("veri", "")
+            if isinstance(inner_raw, str):
+                try:
+                    inner = json.loads(inner_raw)
+                except:
+                    return False, f"❌ İç veri parse edilemedi:\n{inner_raw[:300]}"
+            else:
+                inner = inner_raw
+            return True, inner
+        else:
+            return False, f"❌ Sonuç bulunamadı.\n{str(outer)[:300]}"
+    except requests.exceptions.Timeout:
+        return False, "⏰ Zaman aşımı! API yanıt vermedi."
+    except requests.exceptions.ConnectionError:
+        return False, "🌐 Bağlantı hatası!"
+    except Exception as e:
+        return False, f"❌ Beklenmeyen hata: {e}"
+
+
+def tgid_build_txt_report(username, data, queried_by=""):
+    lines = []
+    sep  = "=" * 60
+    thin = "-" * 60
+    lines.append(sep)
+    lines.append("      TELEGRAM ID SORGU RAPORU - gettg.id")
+    lines.append(sep)
+    lines.append(f" Sorgulanan Kullanıcı : @{username.lstrip('@')}")
+    lines.append(f" Sorgulayan           : {queried_by}")
+    lines.append(f" Tarih                : {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+    lines.append(sep)
+    lines.append("")
+
+    lines.append("[ TEMEL KİMLİK BİLGİLERİ ]")
+    lines.append(thin)
+    lines.append(f"  ID               : {data.get('id', '—')}")
+    lines.append(f"  Kullanıcı Adı    : @{data.get('username', '—')}")
+    lines.append(f"  Ad               : {data.get('first_name', '—')}")
+    lines.append(f"  Soyad            : {data.get('last_name', '—')}")
+    lines.append(f"  Telefon          : {data.get('phone', 'Gizli / Yok')}")
+    lines.append(f"  Dil Kodu         : {data.get('lang_code', '—')}")
+    lines.append(f"  Access Hash      : {data.get('access_hash', '—')}")
+    lines.append("")
+
+    lines.append("[ HESAP TÜRÜ & DURUM ]")
+    lines.append(thin)
+    lines.append(f"  Bot mu?              : {'✅ Evet' if data.get('bot') else '❌ Hayır'}")
+    lines.append(f"  Doğrulanmış          : {'✅ Evet' if data.get('verified') else '❌ Hayır'}")
+    lines.append(f"  Premium              : {'⭐ Evet' if data.get('premium') else '❌ Hayır'}")
+    lines.append(f"  Scam (Dolandırıcı)   : {'⚠️ EVET' if data.get('scam') else '✅ Hayır'}")
+    lines.append(f"  Fake (Sahte)         : {'⚠️ EVET' if data.get('fake') else '✅ Hayır'}")
+    lines.append(f"  Destek Hesabı        : {'✅ Evet' if data.get('support') else '❌ Hayır'}")
+    lines.append(f"  Silinmiş             : {'⚠️ Evet' if data.get('deleted') else '❌ Hayır'}")
+    lines.append(f"  Kısıtlanmış          : {'⚠️ Evet' if data.get('restricted') else '❌ Hayır'}")
+    lines.append(f"  Rehberde Kayıtlı     : {'✅ Evet' if data.get('contact') else '❌ Hayır'}")
+    lines.append(f"  Karşılıklı Kişi      : {'✅ Evet' if data.get('mutual_contact') else '❌ Hayır'}")
+    lines.append(f"  Yakın Arkadaş        : {'✅ Evet' if data.get('close_friend') else '❌ Hayır'}")
+    lines.append(f"  Hikayeler Gizli      : {'✅ Evet' if data.get('stories_hidden') else '❌ Hayır'}")
+    lines.append("")
+
+    photo = data.get("photo")
+    lines.append("[ PROFİL FOTOĞRAFI ]")
+    lines.append(thin)
+    if isinstance(photo, dict):
+        lines.append(f"  Photo ID      : {photo.get('photo_id', '—')}")
+        lines.append(f"  DC ID         : {photo.get('dc_id', '—')}")
+        lines.append(f"  Video mu?     : {'✅ Evet' if photo.get('has_video') else '❌ Hayır'}")
+        lines.append(f"  Personal      : {'✅ Evet' if photo.get('personal') else '❌ Hayır'}")
+    else:
+        lines.append("  Profil fotoğrafı yok / gizli")
+    lines.append("")
+
+    status = data.get("status", {})
+    lines.append("[ SON GÖRÜLME DURUMU ]")
+    lines.append(thin)
+    if isinstance(status, dict):
+        st = status.get("_", "Bilinmiyor")
+        status_map = {
+            "UserStatusRecently":  "🟢 Son zamanlarda online",
+            "UserStatusOnline":    "🟢 Şu an online",
+            "UserStatusOffline":   "⚫ Çevrimdışı",
+            "UserStatusLastWeek":  "🟡 Son bir hafta içinde",
+            "UserStatusLastMonth": "🟠 Son bir ay içinde",
+            "UserStatusEmpty":     "❓ Belirsiz",
+        }
+        lines.append(f"  Durum         : {status_map.get(st, st)}")
+        if "was_online" in status:
+            try:
+                was = datetime.fromtimestamp(status["was_online"]).strftime("%d.%m.%Y %H:%M:%S")
+                lines.append(f"  Son Görülme   : {was}")
+            except:
+                lines.append(f"  Son Görülme   : {status.get('was_online')}")
+    else:
+        lines.append("  Durum bilgisi yok")
+    lines.append("")
+
+    usernames = data.get("usernames", [])
+    if usernames:
+        lines.append("[ ALTERNATİF KULLANICI ADLARI ]")
+        lines.append(thin)
+        for u in usernames:
+            if isinstance(u, dict):
+                lines.append(f"  • @{u.get('username', '—')}  (aktif: {u.get('active', '—')})")
+            else:
+                lines.append(f"  • {u}")
+        lines.append("")
+
+    reasons = data.get("restriction_reason", [])
+    if reasons:
+        lines.append("[ KISITLAMA SEBEPLERİ ]")
+        lines.append(thin)
+        for r in reasons:
+            if isinstance(r, dict):
+                lines.append(f"  • {r.get('platform', '—')}: {r.get('reason', '—')}")
+            else:
+                lines.append(f"  • {r}")
+        lines.append("")
+
+    lines.append(sep)
+    lines.append(" Bu rapor gettg.id API'si kullanılarak oluşturulmuştur.")
+    lines.append(" Developer: @hackledin")
+    lines.append(sep)
+    return "\n".join(lines)
+
+
+def tgid_summary_caption(username, data, user_id):
+    free_left = max(0, TGID_FREE_LIMIT - tgid_get_free_used(user_id))
+    balance   = tgid_get_balance(user_id)
+    if user_id == ADMIN_ID:
+        hak = "👑 Admin — Sınırsız"
+    elif is_premium(user_id):
+        hak = "⭐ Premium — Sınırsız"
+    else:
+        hak = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT} | 💰 Bakiye: {balance}"
+    return (
+        f"✅ <b>Telegram ID Sorgu Tamamlandı!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"👤 <b>@{username.lstrip('@')}</b>\n"
+        f"🆔 ID: <code>{data.get('id', '—')}</code>\n"
+        f"📛 İsim: <b>{data.get('first_name', '—')} {data.get('last_name', '') or ''}</b>\n"
+        f"⭐ Premium: {'Evet' if data.get('premium') else 'Hayır'}\n"
+        f"✅ Doğrulanmış: {'Evet' if data.get('verified') else 'Hayır'}\n"
+        f"🤖 Bot: {'Evet' if data.get('bot') else 'Hayır'}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📊 {hak}"
+    )
+
+
+def tgid_process_search(msg, bot_instance):
+    uid = msg.from_user.id
+    username = msg.text.strip().lstrip("@").strip()
+
+    if not username:
+        bot_instance.reply_to(msg, "❌ Geçersiz kullanıcı adı!")
+        return
+
+    allowed, source = tgid_can_query(uid)
+    if not allowed:
+        free_left = max(0, TGID_FREE_LIMIT - tgid_get_free_used(uid))
+        bot_instance.reply_to(
+            msg,
+            f"❌ <b>Sorgu hakkınız kalmadı!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆓 Free kalan: <b>{free_left}</b>/{TGID_FREE_LIMIT}\n"
+            f"💰 Bakiye: <b>{tgid_get_balance(uid)}</b>\n\n"
+            f"💎 <b>Paket satın almak için aşağıdaki butona bas:</b>",
+            reply_markup=tgid_packages_kb()
+        )
+        return
+
+    wait = bot_instance.reply_to(msg, f"⏳ <code>@{username}</code> sorgulanıyor...")
+
+    success, data = tgid_api_search(username)
+    if not success:
+        try:
+            bot_instance.edit_message_text(data, msg.chat.id, wait.message_id)
+        except:
+            bot_instance.send_message(msg.chat.id, data)
+        tgid_log_query(uid, msg.from_user.username or "", username, "FAIL", str(data)[:100])
+        return
+
+    tgid_use_query(uid)
+
+    queried_by = f"@{msg.from_user.username}" if msg.from_user.username else str(uid)
+    report = tgid_build_txt_report(username, data, queried_by)
+    fname = f"tginfo_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+
+    try:
+        with open(fname, "w", encoding="utf-8") as f:
+            f.write(report)
+    except Exception as e:
+        bot_instance.edit_message_text(f"❌ Rapor oluşturulamadı: {e}", msg.chat.id, wait.message_id)
+        return
+
+    caption = tgid_summary_caption(username, data, uid)
+
+    try:
+        with open(fname, "rb") as f:
+            bot_instance.send_document(msg.chat.id, f, caption=caption)
+        bot_instance.delete_message(msg.chat.id, wait.message_id)
+    except Exception as e:
+        bot_instance.send_message(msg.chat.id, f"❌ Dosya gönderilemedi: {e}")
+    finally:
+        if os.path.exists(fname):
+            os.remove(fname)
+
+    tgid_log_query(uid, msg.from_user.username or "", username, "OK", f"ID={data.get('id')}")
+
+
+def tgid_show_my_stats(chat_id, uid, bot_instance):
+    free_used = tgid_get_free_used(uid)
+    free_left = max(0, TGID_FREE_LIMIT - free_used)
+    balance   = tgid_get_balance(uid)
+    total     = tgid_get_total(uid)
+
+    txt = (
+        f"📊 <b>TELEGRAM ID SORGU İSTATİSTİKLERİN</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🔍 Toplam sorgu: <b>{total}</b>\n"
+        f"🆓 Free kullanılan: <b>{free_used}</b>/{TGID_FREE_LIMIT}\n"
+        f"🆓 Free kalan: <b>{free_left}</b>\n"
+        f"💰 Bakiye: <b>{balance}</b>\n"
+    )
+    if uid == ADMIN_ID:
+        txt += "\n👑 <b>Admin — Sınırsız</b>"
+    elif is_premium(uid):
+        txt += "\n⭐ <b>Premium — Sınırsız</b>"
+
+    bot_instance.send_message(chat_id, txt)
+
+# ══════════════════════════════════════════════════════════════
+#  MULTI-BOT MANAGEMENT
 # ══════════════════════════════════════════════════════════════
 _CHILD_PROCS: dict = {}
 _PROC_LOCK = threading.Lock()
@@ -1734,10 +2156,6 @@ def _save_registry(registry: dict):
         json.dump(registry, f, indent=2)
 
 def _spawn_bot(token: str, owner_id: int = None) -> bool:
-    """
-    Alt botu ayrı bir Python süreci olarak başlatır.
-    Alt süreç, --bot TOKEN --owner ID argümanlarıyla çalışır.
-    """
     if token == BOT_TOKEN:
         print(f"[SPAWN] ⚠️ Ana bot token'ı spawn edilemez!")
         return False
@@ -1751,27 +2169,10 @@ def _spawn_bot(token: str, owner_id: int = None) -> bool:
         python_exe = _get_python_exe()
         args = [python_exe, script_path, "--bot", token, "--owner", str(owner_id)]
         try:
-            # Alt süreç için ortam değişkenleri ile main_bot'u ayır
-            env = os.environ.copy()
-            env["CYBER_CHILD_MODE"] = "1"
-            env["CYBER_CHILD_TOKEN"] = token
-            env["CYBER_CHILD_OWNER"] = str(owner_id)
-            
-            creationflags = 0
-            if sys.platform == "win32":
-                creationflags = subprocess.CREATE_NO_WINDOW
-            else:
-                creationflags = 0
-                
-            proc = subprocess.Popen(
-                args,
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                stdin=subprocess.DEVNULL,
-                creationflags=creationflags,
-                start_new_session=True,
-                env=env
-            )
+            proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                    stdin=subprocess.DEVNULL,
+                                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                                    start_new_session=True)
             with _PROC_LOCK:
                 _CHILD_PROCS[token] = proc
             registry = _load_registry()
@@ -3011,7 +3412,7 @@ def _sms_normal_settings(msg, phone, mail, bot_instance):
     _launch_sms_bomb(uid, phone, mail, "normal", limit, interval, bot_instance)
 
 # ══════════════════════════════════════════════════════════════
-#  HOTMAIL CHECKER v4.0 (DÜZELTİLDİ - bot_instance taşınıyor)
+#  HOTMAIL CHECKER v4.0
 # ══════════════════════════════════════════════════════════════
 HOTMAIL_QUEUE = queue.Queue()
 HOTMAIL_CURRENT_TASK: Optional[dict] = None
@@ -3385,11 +3786,7 @@ def hotmail_check(username, password):
     return result["status"]
 
 def process_hotmail_queue():
-    """
-    DÜZELTİLDİ: Artık bot_instance'ı HOTMAIL_CURRENT_TASK içinden alıyor.
-    Alt bot süreçleri de kendi bot_instance'larını kullanabiliyor.
-    """
-    global HOTMAIL_CURRENT_TASK, HOTMAIL_QUEUE_RUNNING
+    global HOTMAIL_CURRENT_TASK, HOTMAIL_QUEUE_RUNNING, main_bot
     global HOTMAIL_HIT, HOTMAIL_BAD, HOTMAIL_ERROR, HOTMAIL_2FA, HOTMAIL_REWARDS
     global HOTMAIL_KEYWORD_HITS, HOTMAIL_COUNTRY_HITS, HOTMAIL_START_TIME
     
@@ -3408,9 +3805,6 @@ def process_hotmail_queue():
             HOTMAIL_KEYWORD_HITS = {}
             HOTMAIL_COUNTRY_HITS = {}
             
-            # Task içinden bot_instance'ı al
-            bot_instance = task.bot_instance if hasattr(task, 'bot_instance') else main_bot
-            
             with HOTMAIL_QUEUE_LOCK:
                 HOTMAIL_CURRENT_TASK = {
                     "user_id": task.user_id,
@@ -3419,15 +3813,14 @@ def process_hotmail_queue():
                     "is_premium": task.is_premium,
                     "chat_id": task.chat_id,
                     "status_msg_id": task.status_msg_id,
-                    "keywords": task.keywords,
-                    "bot_instance": bot_instance
+                    "keywords": task.keywords
                 }
                 
             print(f"\n🚀 HOTMAIL TARAMA BAŞLADI | {task.user_name} | {len(task.combo_list)} satır")
             
             try:
-                if bot_instance:
-                    bot_instance.edit_message_text(
+                if main_bot:
+                    main_bot.edit_message_text(
                         f"🚀 **Hotmail Checker Başladı!**\n"
                         f"👤 {task.user_name}\n"
                         f"📂 Toplam: {len(task.combo_list)} satır\n"
@@ -3460,10 +3853,10 @@ def process_hotmail_queue():
                             
                         if processed % 10 == 0 or processed == total:
                             try:
-                                if bot_instance:
+                                if main_bot:
                                     elapsed = int(time.time() - HOTMAIL_START_TIME)
                                     cpm = int(processed / (elapsed / 60)) if elapsed > 0 else 0
-                                    bot_instance.edit_message_text(
+                                    main_bot.edit_message_text(
                                         f"🚀 **Hotmail Checker Çalışıyor**\n"
                                         f"👤 {task.user_name}\n"
                                         f"📂 İlerleme: {processed}/{total} (%{int(processed/total*100)})\n"
@@ -3521,12 +3914,12 @@ def process_hotmail_queue():
             result_text = "\n".join(result_lines)
             
             try:
-                if bot_instance:
-                    bot_instance.edit_message_text(result_text, task.chat_id, task.status_msg_id)
+                if main_bot:
+                    main_bot.edit_message_text(result_text, task.chat_id, task.status_msg_id)
                     hit_file = f"hits_{task.user_id}.txt"
                     if os.path.exists(hit_file) and os.path.getsize(hit_file) > 0:
                         with open(hit_file, "rb") as f:
-                            bot_instance.send_document(
+                            main_bot.send_document(
                                 task.chat_id, f,
                                 caption=f"✅ {HOTMAIL_HIT}x Hotmail Hit\n📊 Toplam Hit: {HOTMAIL_HIT}"
                             )
@@ -3552,22 +3945,19 @@ def start_queue_processor():
     HOTMAIL_QUEUE_THREAD = threading.Thread(target=process_hotmail_queue, daemon=True)
     HOTMAIL_QUEUE_THREAD.start()
 
-def add_to_queue(task: HotmailTask, bot_instance):
-    """DÜZELTİLDİ: bot_instance parametre olarak alınıyor."""
+def add_to_queue(task: HotmailTask):
     with HOTMAIL_QUEUE_LOCK:
         position = HOTMAIL_QUEUE.qsize() + 1
         if HOTMAIL_CURRENT_TASK:
             position += 1
         task.queue_position = position
-        # bot_instance'ı task'a ekle
-        task.bot_instance = bot_instance
         HOTMAIL_QUEUE.put(task)
         
         try:
-            if bot_instance:
+            if main_bot:
                 is_prem = task.is_premium
                 limit_text = f"{PREMIUM_CHECK_LIMIT}" if is_prem else f"{FREE_CHECK_LIMIT}"
-                bot_instance.send_message(
+                main_bot.send_message(
                     task.chat_id,
                     f"🚀 **Hotmail taraması sıraya alınıyor...**\n"
                     f"⏳ **Sıraya Alındınız! Sıra Numaranız:** {position}\n"
@@ -3659,7 +4049,7 @@ def _start_hotmail_scan_queue(msg, combo_list, bot_instance):
         is_premium=is_prem,
         keywords=keywords
     )
-    add_to_queue(task, bot_instance)
+    add_to_queue(task)
 
 def get_queue_status_text(user_id: int = None) -> str:
     with HOTMAIL_QUEUE_LOCK:
@@ -3687,14 +4077,14 @@ def get_queue_status_text(user_id: int = None) -> str:
         return "\n".join(lines)
 
 # ══════════════════════════════════════════════════════════════
-#  HANDLER FUNCTIONS (DÜZELTİLDİ)
+#  HANDLER FUNCTIONS
 # ══════════════════════════════════════════════════════════════
+main_bot = None
+
 def register_handlers(bot_instance):
-    """
-    DÜZELTİLDİ: Artık global main_bot'u değiştirmiyor, sadece
-    verilen bot_instance üzerinden handler'ları kaydediyor.
-    """
-    
+    global main_bot
+    main_bot = bot_instance
+
     @bot_instance.message_handler(commands=["start"])
     def cmd_start(msg):
         uid = msg.from_user.id
@@ -3783,6 +4173,32 @@ def register_handlers(bot_instance):
             f"👨‍💻 @hackledin"
         )
         bot_instance.reply_to(msg, stats_text)
+
+    @bot_instance.message_handler(commands=["tgid", "telegramid", "tgsorgu"])
+    def cmd_tgid(msg):
+        uid = msg.from_user.id
+        add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
+        if is_banned(uid):
+            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}")
+            return
+        free_left = max(0, TGID_FREE_LIMIT - tgid_get_free_used(uid))
+        balance = tgid_get_balance(uid)
+        if uid == ADMIN_ID:
+            durum = "👑 Admin — Sınırsız"
+        elif is_premium(uid):
+            durum = "⭐ Premium — Sınırsız"
+        else:
+            durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
+        txt = (
+            f"🆔 <b>TELEGRAM ID SORGU</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"📊 {durum}\n\n"
+            f"🔍 Telegram kullanıcı adını sorgulayıp\n"
+            f"ID, Chat ID, Kanal ID bilgilerini öğren.\n\n"
+            f"<b>Desteklenen:</b> Kullanıcı, Grup, Kanal\n"
+            f"<b>Rapor:</b> TXT dosyası olarak gelir."
+        )
+        bot_instance.reply_to(msg, txt, reply_markup=tgid_kb(uid))
 
     @bot_instance.message_handler(commands=["exif", "foto", "meta"])
     def cmd_exif(msg):
@@ -3937,6 +4353,10 @@ def register_handlers(bot_instance):
             _btn("📢 Duyuru Gönder", "adm_announce"),
             _btn("🤖 Tüm Botları Listele", "adm_listbots"),
             _btn("📋 Hotmail Log", "adm_hotmail_log"),
+            _btn("🆔 TG-ID Bakiye Ver", "adm_tgid_give"),
+            _btn("➖ TG-ID Bakiye Al", "adm_tgid_take"),
+            _btn("📋 TG-ID Logları", "adm_tgid_logs"),
+            _btn("💰 TG-ID Satın Almalar", "adm_tgid_purchases"),
         )
         bot_instance.reply_to(msg, "👑 <b>ADMIN PANELİ</b>", reply_markup=mk)
 
@@ -4159,7 +4579,7 @@ def register_handlers(bot_instance):
                 bot_instance.send_invoice(
                     call.message.chat.id,
                     title="Premium Üyelik",
-                    description="Sınırsız Hotmail + Capture + Keyword",
+                    description="Sınırsız Hotmail + Capture + Keyword + TG-ID",
                     invoice_payload="premium",
                     provider_token="",
                     currency="XTR",
@@ -4192,6 +4612,111 @@ def register_handlers(bot_instance):
                     bot_instance.answer_callback_query(call.id)
                 except:
                     pass
+                return
+
+            # ═══════════════════════════════════════════════
+            #  🆔 TELEGRAM ID SORGU CALLBACK'LERİ
+            # ═══════════════════════════════════════════════
+            if data == "tool_tgid":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except:
+                    pass
+                free_left = max(0, TGID_FREE_LIMIT - tgid_get_free_used(uid))
+                balance = tgid_get_balance(uid)
+                if uid == ADMIN_ID:
+                    durum = "👑 Admin — Sınırsız"
+                elif is_premium(uid):
+                    durum = "⭐ Premium — Sınırsız"
+                else:
+                    durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
+                txt = (
+                    f"🆔 <b>TELEGRAM ID SORGU</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📊 {durum}\n\n"
+                    f"🔍 Telegram kullanıcı adını sorgulayıp\n"
+                    f"ID, Chat ID, Kanal ID bilgilerini öğren.\n\n"
+                    f"<b>Desteklenen:</b> Kullanıcı, Grup, Kanal\n"
+                    f"<b>Rapor:</b> TXT dosyası olarak gelir."
+                )
+                try:
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
+                                                   reply_markup=tgid_kb(uid))
+                except:
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=tgid_kb(uid))
+                return
+
+            if data == "tgid_search":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except:
+                    pass
+                m = bot_instance.send_message(
+                    call.message.chat.id,
+                    "🔍 <b>Telegram ID Sorgu</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Sorgulamak istediğin kullanıcı adını yaz:\n"
+                    "Örnek: <code>@durov</code> veya <code>durov</code>"
+                )
+                bot_instance.register_next_step_handler(m, lambda m: tgid_process_search(m, bot_instance))
+                return
+
+            if data == "tgid_packages":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except:
+                    pass
+                txt = (
+                    f"💎 <b>BAKİYE PAKETLERİ</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Aşağıdan paket seç, Telegram Stars ile öde.\n\n"
+                    f"• <b>{TGID_PACKAGE_25} Sorgu</b> → {TGID_PRICE_25} ⭐\n"
+                    f"• <b>{TGID_PACKAGE_50} Sorgu</b> → {TGID_PRICE_50} ⭐\n"
+                    f"• <b>{TGID_PACKAGE_100} Sorgu</b> → {TGID_PRICE_100} ⭐"
+                )
+                try:
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
+                                                   reply_markup=tgid_packages_kb())
+                except:
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=tgid_packages_kb())
+                return
+
+            if data == "tgid_my_stats":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except:
+                    pass
+                tgid_show_my_stats(call.message.chat.id, uid, bot_instance)
+                return
+
+            if data.startswith("tgid_buy_"):
+                pkg_num = data.replace("tgid_buy_", "")
+                pkg_map = {
+                    "25":  (TGID_PACKAGE_25,  TGID_PRICE_25,  "25 Sorgu"),
+                    "50":  (TGID_PACKAGE_50,  TGID_PRICE_50,  "50 Sorgu"),
+                    "100": (TGID_PACKAGE_100, TGID_PRICE_100, "100 Sorgu"),
+                }
+                if pkg_num not in pkg_map:
+                    try:
+                        bot_instance.answer_callback_query(call.id, "❌ Geçersiz paket!", show_alert=True)
+                    except:
+                        pass
+                    return
+                qty, stars, label = pkg_map[pkg_num]
+                prices = [LabeledPrice(label=label, amount=stars)]
+                try:
+                    bot_instance.send_invoice(
+                        chat_id=call.message.chat.id,
+                        title=f"💎 {label}",
+                        description=f"{qty} adet Telegram ID sorgu hakkı",
+                        invoice_payload=f"tgid_{pkg_num}",
+                        provider_token="",
+                        currency="XTR",
+                        prices=prices,
+                    )
+                    bot_instance.answer_callback_query(call.id, "✅ Fatura gönderildi!")
+                except Exception as e:
+                    bot_instance.answer_callback_query(call.id, f"❌ Hata: {e}", show_alert=True)
                 return
 
             if data == "tool_exif":
@@ -4594,9 +5119,42 @@ def register_handlers(bot_instance):
         uid = msg.from_user.id
         username = msg.from_user.username or msg.from_user.first_name or str(uid)
         payload = msg.successful_payment.invoice_payload
+
+        # 🆔 Telegram ID Sorgu ödemesi
+        if payload.startswith("tgid_"):
+            pkg_num = payload.replace("tgid_", "")
+            pkg_map = {
+                "25":  (TGID_PACKAGE_25,  TGID_PRICE_25,  "25 Sorgu"),
+                "50":  (TGID_PACKAGE_50,  TGID_PRICE_50,  "50 Sorgu"),
+                "100": (TGID_PACKAGE_100, TGID_PRICE_100, "100 Sorgu"),
+            }
+            if pkg_num in pkg_map:
+                qty, stars, label = pkg_map[pkg_num]
+                tgid_add_balance(uid, qty)
+                tgid_log_purchase(uid, username, label, qty, stars)
+                bot_instance.reply_to(
+                    msg,
+                    f"🎉 <b>Ödeme Başarılı!</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"💎 Paket: <b>{label}</b>\n"
+                    f"➕ Eklenen: <b>+{qty}</b> Telegram ID sorgu hakkı\n"
+                    f"💰 Yeni Bakiye: <b>{tgid_get_balance(uid)}</b>\n\n"
+                    f"Hemen sorgulamaya başlayabilirsin! 🔍"
+                )
+                try:
+                    bot_instance.send_message(
+                        ADMIN_ID,
+                        f"💰 <b>YENİ TG-ID SATIN ALMA!</b>\n"
+                        f"👤 @{username}\n"
+                        f"📦 {label} — {stars} ⭐"
+                    )
+                except:
+                    pass
+            return
+
         if payload == "premium":
             set_premium(uid, username)
-            bot_instance.reply_to(msg, "🎉 **Hotmail Premium aktif!**\n📧 Sınırsız Hotmail Check + 📸 Sınırsız Capture + 🔖 Sınırsız Keyword erişimi kazandın.")
+            bot_instance.reply_to(msg, "🎉 **Hotmail Premium aktif!**\n📧 Sınırsız Hotmail + 📸 Sınırsız Capture + 🔖 Sınırsız Keyword + 🆔 Sınırsız TG-ID erişimi kazandın.")
             bot_instance.send_message(
                 ADMIN_ID,
                 f"📧 <b>YENİ HOTMAIL PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {PREMIUM_PRICE} Stars"
@@ -4871,6 +5429,8 @@ def _show_stats(chat_id, uid, bot_instance):
            f"🔍 Sorgu: <b>{checks}</b>\n📦 Combo: <b>{combos}</b>\n"
            f"📧 Hotmail Premium: {'⭐ AKTİF' if is_prem else '❌ Pasif'}\n"
            f"🌍 OSINT Premium: {'⭐ AKTİF' if is_prem_osint else '❌ Pasif'}\n"
+           f"🆔 TG-ID Free: {TGID_FREE_LIMIT - tgid_get_free_used(uid)}/{TGID_FREE_LIMIT}\n"
+           f"💰 TG-ID Bakiye: {tgid_get_balance(uid)}\n"
            f"📊 Günlük: {daily['checks']}/{limit}\n"
            f"📸 Capture: {capture_used}/{'♾️' if is_prem else FREE_CAPTURE_LIMIT}\n"
            f"\n👨‍💻 @hackledin")
@@ -4886,6 +5446,7 @@ def _show_profile(chat_id, uid, bot_instance):
     daily = get_daily_usage(uid)
     limit = PREMIUM_CHECK_LIMIT if is_prem else FREE_CHECK_LIMIT
     kw_list = keywords.split(',') if keywords else []
+    tgid_free = max(0, TGID_FREE_LIMIT - tgid_get_free_used(uid))
     txt = (f"⚡️ **SİSTEME HOŞGELDİNİZ**\n"
            f"{user_name} — {uid}\n"
            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -4899,6 +5460,10 @@ def _show_profile(chat_id, uid, bot_instance):
            f"┣ Thread Sayısı:   {HOTMAIL_THREADS} (10-100)\n"
            f"┣ Keywordler:      {len(kw_list)} / {get_keyword_limit_text(uid)}\n"
            f"┗ Capture Kullanım: {capture_used} / {'♾️' if is_prem else FREE_CAPTURE_LIMIT}\n"
+           f"🆔 **TELEGRAM ID SORGU**\n"
+           f"┣ Toplam: {tgid_get_total(uid)}\n"
+           f"┣ Free kalan: {tgid_free}/{TGID_FREE_LIMIT}\n"
+           f"┗ Bakiye: {tgid_get_balance(uid)}\n"
            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
            f"⭐ **PREMIUM DURUM**\n"
            f"📧 Hotmail: {'⭐ AKTİF' if is_prem else '❌ Pasif'}\n"
@@ -5454,6 +6019,72 @@ def _handle_admin_cb(call, action, bot_instance):
             except:
                 pass
             return
+        # ═══════════════════════════════════════════════
+        #  🆔 TELEGRAM ID SORGU ADMIN İŞLEMLERİ
+        # ═══════════════════════════════════════════════
+        elif action == "tgid_give":
+            m = bot_instance.send_message(
+                cid,
+                "🆔 <b>TG-ID Bakiye Ver</b>\n"
+                "Format: <code>USER_ID MIKTAR</code>\n"
+                "Örnek: <code>123456789 50</code>"
+            )
+            bot_instance.register_next_step_handler(m, lambda m: _admin_tgid_give(m, bot_instance))
+            try:
+                bot_instance.answer_callback_query(call.id)
+            except:
+                pass
+            return
+        elif action == "tgid_take":
+            m = bot_instance.send_message(
+                cid,
+                "➖ <b>TG-ID Bakiye Al</b>\n"
+                "Format: <code>USER_ID MIKTAR</code>\n"
+                "Örnek: <code>123456789 10</code>"
+            )
+            bot_instance.register_next_step_handler(m, lambda m: _admin_tgid_take(m, bot_instance))
+            try:
+                bot_instance.answer_callback_query(call.id)
+            except:
+                pass
+            return
+        elif action == "tgid_logs":
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("SELECT user_id, username, target, status, date FROM tgid_logs ORDER BY id DESC LIMIT 20")
+            logs = c.fetchall()
+            conn.close()
+            if not logs:
+                bot_instance.send_message(cid, "📭 TG-ID sorgu logu yok.")
+            else:
+                txt = "📋 <b>SON 20 TG-ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                for u_id, uname, target, status, date in logs:
+                    ico = "✅" if status == "OK" else "❌"
+                    txt += f"{ico} @{target} — @{uname or u_id} | {date[5:16]}\n"
+                bot_instance.send_message(cid, txt[:4096])
+            try:
+                bot_instance.answer_callback_query(call.id)
+            except:
+                pass
+            return
+        elif action == "tgid_purchases":
+            conn = sqlite3.connect(DB_PATH)
+            c = conn.cursor()
+            c.execute("SELECT user_id, username, package, queries, stars, date FROM tgid_purchases ORDER BY id DESC LIMIT 20")
+            logs = c.fetchall()
+            conn.close()
+            if not logs:
+                bot_instance.send_message(cid, "📭 TG-ID satın alma yok.")
+            else:
+                txt = "💰 <b>SON 20 TG-ID SATIN ALMA</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                for u_id, uname, package, q, stars, date in logs:
+                    txt += f"👤 @{uname or u_id} | {package} | +{q} | {stars}⭐ | {date[5:16]}\n"
+                bot_instance.send_message(cid, txt[:4096])
+            try:
+                bot_instance.answer_callback_query(call.id)
+            except:
+                pass
+            return
     except Exception as e:
         print(f"[ADMIN CALLBACK ERROR] {e}")
         try:
@@ -5545,58 +6176,90 @@ def _admin_announce(msg, bot_instance):
     )
 
 # ══════════════════════════════════════════════════════════════
-#  MAIN (DÜZELTİLDİ)
+#  🆔 TELEGRAM ID SORGU ADMIN FONKSİYONLARI
+# ══════════════════════════════════════════════════════════════
+def _admin_tgid_give(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    try:
+        parts = msg.text.strip().split()
+        target = int(parts[0])
+        amount = int(parts[1])
+        if amount <= 0:
+            raise ValueError
+    except:
+        bot_instance.reply_to(msg, "❌ Geçersiz format! Örnek: <code>123456789 50</code>")
+        return
+    add_user(target, "", "")
+    tgid_init_user(target)
+    tgid_add_balance(target, amount)
+    bot_instance.reply_to(
+        msg,
+        f"✅ <b>TG-ID Bakiye Verildi!</b>\n"
+        f"🆔 Kullanıcı: <code>{target}</code>\n"
+        f"➕ Miktar: <b>+{amount}</b>\n"
+        f"💰 Yeni bakiye: <b>{tgid_get_balance(target)}</b>"
+    )
+    try:
+        bot_instance.send_message(
+            target,
+            f"🎁 <b>Admin sana Telegram ID Sorgu bakiyesi verdi!</b>\n"
+            f"➕ Eklenen: <b>+{amount}</b> sorgu\n"
+            f"💰 Yeni bakiyen: <b>{tgid_get_balance(target)}</b>"
+        )
+    except:
+        pass
+
+def _admin_tgid_take(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    try:
+        parts = msg.text.strip().split()
+        target = int(parts[0])
+        amount = int(parts[1])
+        if amount <= 0:
+            raise ValueError
+    except:
+        bot_instance.reply_to(msg, "❌ Geçersiz format! Örnek: <code>123456789 10</code>")
+        return
+    current = tgid_get_balance(target)
+    new_bal = max(0, current - amount)
+    tgid_set(target, "query_balance", new_bal)
+    bot_instance.reply_to(
+        msg,
+        f"✅ <b>TG-ID Bakiye Alındı!</b>\n"
+        f"🆔 Kullanıcı: <code>{target}</code>\n"
+        f"➖ Miktar: <b>-{amount}</b>\n"
+        f"💰 Yeni bakiye: <b>{new_bal}</b>"
+    )
+
+# ══════════════════════════════════════════════════════════════
+#  MAIN
 # ══════════════════════════════════════════════════════════════
 if __name__ == "__main__":
-    # Alt süreç modu kontrolü
     child_mode = False
     child_token = None
-    owner_id = None
-    
-    # Argümanlardan veya ortam değişkenlerinden oku
     argv = sys.argv[1:]
     for i, arg in enumerate(argv):
         if arg == "--bot" and i + 1 < len(argv):
             child_mode = True
             child_token = argv[i + 1]
-        elif arg == "--owner" and i + 1 < len(argv):
-            owner_id = argv[i + 1]
-    
-    # Ortam değişkenlerinden de kontrol et
-    if os.environ.get("CYBER_CHILD_MODE") == "1":
-        child_mode = True
-        child_token = os.environ.get("CYBER_CHILD_TOKEN") or child_token
-        owner_id = os.environ.get("CYBER_CHILD_OWNER") or owner_id
-    
+            
     if child_mode and child_token:
         print(f"[CHILD] Starting bot with token: {child_token[:10]}...")
-        print(f"[CHILD] Owner ID: {owner_id}")
-        
-        # Alt bot için ayrı bir TeleBot instance'ı
         child_bot = telebot.TeleBot(child_token, parse_mode="HTML")
-        
-        # Handler'ları child_bot üzerinden kaydet
         register_handlers(child_bot)
-        
-        # Alt bot için main_bot referansını child_bot olarak ayarla
-        # (Hotmail queue gibi thread'ler kendi bot_instance'larını kullanacak)
-        main_bot = child_bot
-        
         print(f"[CHILD] Bot {child_token[:10]}... ready!")
         try:
             child_bot.infinity_polling(timeout=60)
         except Exception as e:
             print(f"[CHILD] Polling error: {e}")
         sys.exit(0)
-    
-    # Ana bot modu
-    print("[MAIN] Starting Cyber Searcher v4.3...")
+        
     main_bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
     register_handlers(main_bot)
-    
-    print("[MAIN] Starting saved child bots...")
+    print("[MAIN] Starting saved bots...")
     start_saved_bots()
-    
     print("""
 ╔══════════════════════════════════════════════════════╗
 ║       CYBER SEARCHER v4.3 — PRODUCTION               ║
@@ -5610,14 +6273,13 @@ if __name__ == "__main__":
 ║  ✅ Capture Tool                                     ║
 ║  ✅ SMS Bomber (41+ Servis)                          ║
 ║  ✅ EXIF Metadata                                    ║
-║  ✅ Alt Bot Desteği (Düzeltildi)                    ║
+║  ✅ Telegram ID Sorgu (gettg.id) — YENİ!            ║
 ║  ✅ Türkçe / English / العربية                       ║
 ╚══════════════════════════════════════════════════════╝
 """)
-    
     while True:
         try:
-            main_bot.infinity_polling(timeout=60)
+            main_bot.polling(none_stop=True, timeout=60)
         except Exception as e:
             print(f"[HATA] {e}")
             time.sleep(5)
