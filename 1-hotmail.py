@@ -74,10 +74,9 @@ TGID_PRICE_50          = 180
 TGID_PRICE_100         = 250
 
 # ══════════════════════════════════════════════════════════════
-#  🎨 AI IMAGE GENERATOR (text2image)
+#  🎨 AI IMAGE GENERATOR (Pollinations.ai — ücretsiz, key yok)
 # ══════════════════════════════════════════════════════════════
-AIIMG_API_URL          = "https://data.miaitool.com/api/text2image"
-AIIMG_SOURCE_URL       = "https://www.aidoimg.com/ai-image-tools/ai-image-generator/index"
+AIIMG_BASE_URL         = "https://image.pollinations.ai/prompt/"
 AIIMG_FREE_LIMIT       = 2
 AIIMG_PACKAGE_10       = 10
 AIIMG_PACKAGE_20       = 20
@@ -89,7 +88,8 @@ AIIMG_PRICE_20         = 100
 AIIMG_PRICE_30         = 150
 AIIMG_PRICE_50         = 350
 AIIMG_PRICE_100        = 600
-AIIMG_SIZE             = "576x1024"
+AIIMG_WIDTH            = 576
+AIIMG_HEIGHT           = 1024
 
 # ══════════════════════════════════════════════════════════════
 #  YT-DLP POT PROVIDER AYARI
@@ -2070,41 +2070,53 @@ def aiimg_packages_kb():
     return mk
 
 def aiimg_generate(prompt, is_nsfw=False):
-    """API ile resim üretir, başarılı olursa image_url döner."""
+    """Pollinations.ai ile resim üretir. Başarılı olursa (True, image_url) döner."""
     try:
-        payload = {
-            "prompt": prompt,
-            "size": AIIMG_SIZE,
-            "function": "ai-image-generator-text2image",
-            "source_url": AIIMG_SOURCE_URL
-        }
+        from urllib.parse import quote
+
+        final_prompt = prompt.strip()
         if is_nsfw:
-            payload["prompt"] = f"NSFW, explicit, adult content, {prompt}"
-        r = requests.post(AIIMG_API_URL, data=payload, timeout=30)
-        data = r.json()
-        task_id = data.get("task_id")
-        if not task_id:
-            return False, "❌ Task ID alınamadı. API yanıtı: " + str(data)[:200]
-        status_payload = {
-            "task_id": task_id,
-            "source_url": "https://google.com"
+            final_prompt = f"NSFW, explicit, adult content, nude, {final_prompt}"
+
+        # Pollinations direkt resim URL'si verir (GET)
+        encoded = quote(final_prompt)
+        image_url = (
+            f"{AIIMG_BASE_URL}{encoded}"
+            f"?width={AIIMG_WIDTH}&height={AIIMG_HEIGHT}"
+            f"&nologo=true&enhance=true&seed={randint(1, 999999)}"
+        )
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "image/*,*/*",
         }
-        max_tries = 40
-        for i in range(max_tries):
-            time.sleep(2.5)
-            status_res = requests.post(AIIMG_API_URL, data=status_payload, timeout=20)
-            result = status_res.json()
-            task_status = result.get("task_status") or result.get("status")
-            if task_status == "SUCCEEDED":
-                image_url = result.get("url")
-                if image_url:
-                    return True, image_url
-                return False, "❌ Resim URL bulunamadı."
-            elif task_status == "FAILED":
-                return False, f"❌ Üretim başarısız: {result}"
-        return False, "⏰ Zaman aşımı. Lütfen tekrar dene."
+
+        # Resmi indirip doğrula (Telegram URL ile de gönderebilir ama indirme daha güvenli)
+        r = requests.get(image_url, headers=headers, timeout=90, stream=True)
+        if r.status_code != 200:
+            return False, f"❌ API hatası HTTP {r.status_code}"
+
+        content_type = (r.headers.get("content-type") or "").lower()
+        if "image" not in content_type and "octet" not in content_type:
+            return False, f"❌ Geçersiz cevap (image değil): {content_type}"
+
+        data = r.content
+        if not data or len(data) < 2000:
+            return False, "❌ Resim çok küçük veya boş geldi. Tekrar dene."
+
+        # Geçici dosyaya kaydet
+        os.makedirs("aiimg_tmp", exist_ok=True)
+        fname = f"aiimg_tmp/{uuid.uuid4().hex}.jpg"
+        with open(fname, "wb") as f:
+            f.write(data)
+
+        return True, fname
+    except requests.exceptions.Timeout:
+        return False, "⏰ Zaman aşımı. Tekrar dene."
+    except requests.exceptions.ConnectionError:
+        return False, "🌐 Bağlantı hatası. İnternet kontrol et."
     except Exception as e:
-        return False, f"❌ Hata: {e}"
+        return False, f"❌ Hata: <code>{e}</code>"
 
 def aiimg_process(msg, bot_instance, is_nsfw=False):
     uid = msg.from_user.id
@@ -2147,11 +2159,21 @@ def aiimg_process(msg, bot_instance, is_nsfw=False):
         f"🤖 Cyber Searcher | @hackledin"
     )
     try:
-        bot_instance.send_photo(msg.chat.id, result, caption=caption, parse_mode="HTML")
-        bot_instance.delete_message(msg.chat.id, wait.message_id)
+        with open(result, "rb") as photo:
+            bot_instance.send_photo(msg.chat.id, photo, caption=caption, parse_mode="HTML")
+        try:
+            bot_instance.delete_message(msg.chat.id, wait.message_id)
+        except:
+            pass
     except Exception as e:
-        bot_instance.send_message(msg.chat.id, f"✅ Resim: {result}\n\n{caption}\n\n⚠️ Fotoğraf gönderilemedi: {e}", parse_mode="HTML")
-    aiimg_log(uid, username, prompt, is_nsfw, "OK", result[:100])
+        bot_instance.send_message(msg.chat.id, f"⚠️ Fotoğraf gönderilemedi: <code>{e}</code>", parse_mode="HTML")
+    finally:
+        if result and os.path.exists(result):
+            try:
+                os.remove(result)
+            except:
+                pass
+    aiimg_log(uid, username, prompt, is_nsfw, "OK", "local_file")
 
 # ══════════════════════════════════════════════════════════════
 #  MULTI-BOT MANAGEMENT
