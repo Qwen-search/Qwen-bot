@@ -53,6 +53,7 @@ DB_PATH       = "cyber_searcher.db"
 BOT_REGISTRY_FILE = "bot_registry.json"
 PREMIUM_PRICE = 400
 OSINT_PRICE = 200
+LOG_PRICE = 600
 FREE_CHECK_LIMIT = 3000
 PREMIUM_CHECK_LIMIT = 999999
 FREE_CAPTURE_LIMIT = 3
@@ -60,6 +61,14 @@ PREMIUM_CAPTURE_LIMIT = 999
 FREE_KEYWORD_LIMIT = 3
 PREMIUM_KEYWORD_LIMIT = 999
 SMS_COUNT = 41
+
+# ══════════════════════════════════════════════════════════════
+#  📂 LOG ÇEKME API
+# ══════════════════════════════════════════════════════════════
+LOG_API_BASE   = "https://site-viphesab.my-board.org/log.php"
+LOG_AUTH       = "@gaynotcu"
+LOG_FREE_LIMIT = 3          # Free kullanıcı 3 hak
+LOG_FREE_MAX   = 100        # Free'nin API limit=100
 
 # ══════════════════════════════════════════════════════════════
 #  🆔 TELEGRAM ID SORGU (gettg.id API)
@@ -131,15 +140,28 @@ def db_init():
         total_combos INTEGER DEFAULT 0,
         is_premium INTEGER DEFAULT 0,
         is_premium_osint INTEGER DEFAULT 0,
+        is_premium_log INTEGER DEFAULT 0,
         premium_date TEXT DEFAULT '',
         premium_osint_date TEXT DEFAULT '',
+        premium_log_date TEXT DEFAULT '',
         language TEXT DEFAULT 'tr',
         api_pref INTEGER DEFAULT 0,
         keywords TEXT DEFAULT 'tiktok,instagram,netflix',
         is_banned INTEGER DEFAULT 0,
         ban_reason TEXT DEFAULT '',
-        capture_used INTEGER DEFAULT 0
+        capture_used INTEGER DEFAULT 0,
+        log_used INTEGER DEFAULT 0
     )''')
+    # Eski DB'ler için kolon ekle
+    for col, typedef in [
+        ("is_premium_log", "INTEGER DEFAULT 0"),
+        ("premium_log_date", "TEXT DEFAULT ''"),
+        ("log_used", "INTEGER DEFAULT 0"),
+    ]:
+        try:
+            c.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
+        except:
+            pass
     c.execute('''CREATE TABLE IF NOT EXISTS premium_logs (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER,
@@ -264,6 +286,12 @@ def is_premium_osint(user_id):
     except:
         return False
 
+def is_premium_log(user_id):
+    try:
+        return db_get(user_id, "is_premium_log") == 1
+    except:
+        return False
+
 def is_banned(user_id):
     try:
         return db_get(user_id, "is_banned") == 1
@@ -309,6 +337,22 @@ def set_premium_osint(user_id, username=""):
         print(f"[PREMIUM ERROR] set_premium_osint: {e}")
         return False
 
+def set_premium_log(user_id, username=""):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("UPDATE users SET is_premium_log=1, premium_log_date=? WHERE user_id=?", (now, user_id))
+        c.execute("INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
+                  (user_id, username, "LOG", LOG_PRICE, now))
+        conn.commit()
+        conn.close()
+        print(f"[PREMIUM] LOG Premium verildi: {user_id} - {username}")
+        return True
+    except Exception as e:
+        print(f"[PREMIUM ERROR] set_premium_log: {e}")
+        return False
+
 def remove_premium(user_id):
     db_set(user_id, "is_premium", 0)
     db_set(user_id, "premium_date", "")
@@ -316,6 +360,34 @@ def remove_premium(user_id):
 def remove_premium_osint(user_id):
     db_set(user_id, "is_premium_osint", 0)
     db_set(user_id, "premium_osint_date", "")
+
+def remove_premium_log(user_id):
+    db_set(user_id, "is_premium_log", 0)
+    db_set(user_id, "premium_log_date", "")
+
+def get_log_used(user_id):
+    try:
+        return db_get(user_id, "log_used") or 0
+    except:
+        return 0
+
+def increment_log_used(user_id):
+    current = get_log_used(user_id)
+    db_set(user_id, "log_used", current + 1)
+
+def can_use_log(user_id):
+    if user_id == ADMIN_ID or is_premium_log(user_id):
+        return True, "premium"
+    used = get_log_used(user_id)
+    if used < LOG_FREE_LIMIT:
+        return True, "free"
+    return False, None
+
+def get_log_limit_text(user_id):
+    if user_id == ADMIN_ID or is_premium_log(user_id):
+        return "♾️ Sınırsız"
+    left = max(0, LOG_FREE_LIMIT - get_log_used(user_id))
+    return f"{left}/{LOG_FREE_LIMIT}"
 
 def get_user_stats(user_id):
     try:
@@ -1709,6 +1781,7 @@ S = {
             "   • 📸 Capture Tool - Free 3 kullanım\n"
             "   • 📸 EXIF Metadata Analizi ✅\n"
             "   • 🎨 AI Image Generator ✅ (Free 2 hak | +18 ayrı)\n"
+            "   • 📂 Log Çekme ✅ (Free 3 hak / max 100 | Premium 600⭐)\n"
             "👨‍💻 coded by: @hackledin"
         ),
     },
@@ -1970,9 +2043,157 @@ def tools_kb(user_id):
         _btn("📸 EXIF Metadata", "tool_exif"),
         _btn("🆔 Telegram ID Sorgu", "tool_tgid"),
         _btn("🎨 AI Image Generator", "tool_aiimg"),
+        _btn("📂 Log Çekme", "tool_log"),
     )
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
     return mk
+
+def log_kb(user_id):
+    mk = InlineKeyboardMarkup(row_width=1)
+    durum = get_log_limit_text(user_id)
+    if is_premium_log(user_id) or user_id == ADMIN_ID:
+        mk.add(_btn(f"⭐ LOG Premium Aktif — {durum}", "noop"))
+        mk.add(_btn("🔍 Domain Log Çek", "log_search"))
+    else:
+        mk.add(_btn(f"🆓 Free hak: {durum}", "noop"))
+        mk.add(_btn("🔍 Domain Log Çek (Free 100 limit)", "log_search"))
+        mk.add(_btn(f"⭐ LOG Premium Satın Al ({LOG_PRICE}⭐)", "buy_log"))
+    mk.add(_btn("◀️ Geri", "goto_tools"))
+    return mk
+
+def log_fetch(domain, limit=None):
+    """Log API'den veri çeker. Başarılıysa (True, text) döner."""
+    try:
+        domain = domain.strip().lower()
+        domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
+        domain = domain.split("/")[0].strip()
+        if not domain or "." not in domain:
+            return False, "❌ Geçersiz domain! Örnek: netflix.com"
+
+        params = {"url": domain, "auth": LOG_AUTH}
+        if limit is not None:
+            params["limit"] = str(limit)
+
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept": "text/plain, text/html, */*",
+        }
+        r = requests.get(LOG_API_BASE, params=params, headers=headers, timeout=60)
+        print(f"[LOG] {domain} status={r.status_code} len={len(r.text)}")
+
+        if r.status_code != 200:
+            return False, f"❌ API hatası HTTP {r.status_code}"
+
+        text = (r.text or "").strip()
+        if not text:
+            return False, f"❌ <b>{domain}</b> için sonuç bulunamadı."
+
+        # Hata mesajı kontrolü
+        low = text.lower()
+        if any(x in low for x in ["error", "yetkisiz", "unauthorized", "invalid auth", "forbidden"]):
+            if len(text) < 300:
+                return False, f"❌ API: <code>{text[:200]}</code>"
+
+        return True, text
+    except requests.exceptions.Timeout:
+        return False, "⏰ API zaman aşımı. Tekrar dene."
+    except requests.exceptions.ConnectionError:
+        return False, "🌐 API bağlantı hatası."
+    except Exception as e:
+        return False, f"❌ Hata: <code>{e}</code>"
+
+def log_process(msg, bot_instance):
+    uid = msg.from_user.id
+    username = msg.from_user.username or ""
+    domain = (msg.text or "").strip()
+
+    allowed, source = can_use_log(uid)
+    if not allowed:
+        bot_instance.reply_to(
+            msg,
+            f"❌ <b>Log hakkınız kalmadı!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆓 Free: {LOG_FREE_LIMIT} hak kullanıldı\n\n"
+            f"⭐ Sınırsız log için LOG Premium al:",
+            reply_markup=log_kb(uid),
+            parse_mode="HTML"
+        )
+        return
+
+    is_prem = is_premium_log(uid) or uid == ADMIN_ID
+    limit = None if is_prem else LOG_FREE_MAX
+
+    wait = bot_instance.reply_to(
+        msg,
+        f"📂 <b>Log çekiliyor...</b>\n"
+        f"🌐 Domain: <code>{domain}</code>\n"
+        f"📊 Limit: {'Sınırsız' if is_prem else f'{LOG_FREE_MAX} satır'}\n"
+        f"⏳ Lütfen bekle...",
+        parse_mode="HTML"
+    )
+
+    success, data = log_fetch(domain, limit=limit)
+    if not success:
+        try:
+            bot_instance.edit_message_text(data, msg.chat.id, wait.message_id, parse_mode="HTML")
+        except:
+            bot_instance.send_message(msg.chat.id, data, parse_mode="HTML")
+        return
+
+    # Free hakkını düş
+    if not is_prem:
+        increment_log_used(uid)
+
+    # TXT dosyası oluştur
+    safe_domain = re.sub(r"[^a-zA-Z0-9._-]", "_", domain)[:40]
+    fname = f"LOG_{safe_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+    line_count = len([ln for ln in data.splitlines() if ln.strip()])
+
+    header = (
+        f"{'=' * 50}\n"
+        f"  📂 LOG RAPORU — Cyber Searcher\n"
+        f"{'=' * 50}\n"
+        f"  Domain   : {domain}\n"
+        f"  Satır    : {line_count}\n"
+        f"  Mod      : {'⭐ Premium' if is_prem else '🆓 Free (max 100)'}\n"
+        f"  Tarih    : {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}\n"
+        f"  Not      : Veriler 2025 & 2026 kayıtlarını içerir\n"
+        f"{'=' * 50}\n\n"
+    )
+    try:
+        with open(fname, "w", encoding="utf-8") as f:
+            f.write(header + data)
+    except Exception as e:
+        bot_instance.edit_message_text(f"❌ Dosya yazılamadı: {e}", msg.chat.id, wait.message_id)
+        return
+
+    left = get_log_limit_text(uid)
+    caption = (
+        f"✅ <b>Log Çekildi!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🌐 Domain: <code>{domain}</code>\n"
+        f"📄 Satır: <b>{line_count}</b>\n"
+        f"📊 Hak: {left}\n"
+        f"📅 Veri: <b>2025 & 2026</b> kayıtları\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📁 Sonuç TXT dosyasında"
+    )
+    try:
+        with open(fname, "rb") as f:
+            bot_instance.send_document(msg.chat.id, f, caption=caption, parse_mode="HTML")
+        try:
+            bot_instance.delete_message(msg.chat.id, wait.message_id)
+        except:
+            pass
+    except Exception as e:
+        bot_instance.send_message(msg.chat.id, f"❌ Dosya gönderilemedi: {e}", parse_mode="HTML")
+    finally:
+        if os.path.exists(fname):
+            try:
+                os.remove(fname)
+            except:
+                pass
+    print(f"[LOG] OK | {get_user_name(uid)} | {domain} | {line_count} satır")
 
 def turkey_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
@@ -2019,6 +2240,7 @@ def premium_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=1)
     mk.add(_btn("⭐ Premium Satın Al (400⭐)", "buy_premium"))
     mk.add(_btn("🌍 OSINT Premium Satın Al (200⭐)", "buy_osint"))
+    mk.add(_btn(f"📂 LOG Premium Satın Al ({LOG_PRICE}⭐)", "buy_log"))
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
     return mk
 
@@ -3790,6 +4012,68 @@ def register_handlers(bot_instance):
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 return
+            if data == "buy_log":
+                if is_premium_log(uid):
+                    try: bot_instance.answer_callback_query(call.id, "📂 Zaten LOG Premium sahibisiniz!", show_alert=True)
+                    except: pass
+                    return
+                prices = [LabeledPrice(label="📂 LOG Premium", amount=LOG_PRICE)]
+                bot_instance.send_invoice(
+                    call.message.chat.id,
+                    title="LOG Premium",
+                    description="Sınırsız domain log çekme — 2025 & 2026 verileri",
+                    invoice_payload="log",
+                    provider_token="",
+                    currency="XTR",
+                    prices=prices
+                )
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                return
+            # ═══ 📂 LOG ÇEKME ═══
+            if data == "tool_log":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                durum = get_log_limit_text(uid)
+                txt = (
+                    f"📂 <b>LOG ÇEKME</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📊 Hak durumun: <b>{durum}</b>\n\n"
+                    f"🌐 Domain girerek log (combo/leak) çek.\n"
+                    f"📄 Sonuç <b>TXT dosyası</b> olarak gelir.\n\n"
+                    f"📌 <b>Örnek domain:</b>\n"
+                    f"• <code>netflix.com</code>\n"
+                    f"• <code>instagram.com</code>\n"
+                    f"• <code>spotify.com</code>\n\n"
+                    f"🆓 Free: <b>{LOG_FREE_LIMIT} hak</b> · max <b>{LOG_FREE_MAX}</b> satır\n"
+                    f"⭐ LOG Premium ({LOG_PRICE}⭐): <b>Sınırsız</b>\n\n"
+                    f"📅 <i>Veritabanı 2025 ve 2026 kayıtlarını içerir.</i>"
+                )
+                try:
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
+                                                   reply_markup=log_kb(uid), parse_mode="HTML")
+                except:
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=log_kb(uid), parse_mode="HTML")
+                return
+            if data == "log_search":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                allowed, _ = can_use_log(uid)
+                if not allowed:
+                    bot_instance.send_message(
+                        call.message.chat.id,
+                        f"❌ <b>Log hakkınız kalmadı!</b>\n⭐ Premium için butona bas:",
+                        reply_markup=log_kb(uid), parse_mode="HTML"
+                    )
+                    return
+                m = bot_instance.send_message(
+                    call.message.chat.id,
+                    "📂 <b>Log Çekme</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Domain adını yaz:\n\n"
+                    "📌 Örnek: <code>netflix.com</code>",
+                    parse_mode="HTML"
+                )
+                bot_instance.register_next_step_handler(m, lambda m: log_process(m, bot_instance))
+                return
             # ═══ 🆔 TG-ID CALLBACK'LERİ ═══
             if data == "tool_tgid":
                 try: bot_instance.answer_callback_query(call.id)
@@ -4245,6 +4529,16 @@ def register_handlers(bot_instance):
             set_premium_osint(uid, username)
             bot_instance.reply_to(msg, "🌍 **OSINT Premium aktif!**\n🔍 LeakSights OSINT (30+ Sorgu) erişimi kazandın.")
             bot_instance.send_message(ADMIN_ID, f"🌍 <b>YENİ OSINT PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {OSINT_PRICE} Stars")
+        elif payload == "log":
+            set_premium_log(uid, username)
+            bot_instance.reply_to(
+                msg,
+                "🎉 <b>LOG Premium aktif!</b>\n"
+                "📂 Sınırsız domain log çekme erişimi kazandın.\n"
+                "📅 Veriler: <b>2025 & 2026</b>",
+                parse_mode="HTML"
+            )
+            bot_instance.send_message(ADMIN_ID, f"📂 <b>YENİ LOG PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {LOG_PRICE} Stars")
 
 # ══════════════════════════════════════════════════════════════
 #  PROCESS FUNCTIONS
