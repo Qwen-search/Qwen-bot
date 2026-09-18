@@ -2061,8 +2061,42 @@ def log_kb(user_id):
     mk.add(_btn("◀️ Geri", "goto_tools"))
     return mk
 
+def _log_solve_cookie(session, html_text):
+    """freehosting __test cookie (AES) çözümü."""
+    try:
+        from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+        from cryptography.hazmat.backends import default_backend
+
+        def to_numbers(d):
+            return [int(d[i:i + 2], 16) for i in range(0, len(d), 2)]
+
+        def to_hex(arr):
+            return "".join(f"{x:02x}" for x in arr)
+
+        m = re.search(
+            r'toNumbers\("([0-9a-f]+)"\).*?toNumbers\("([0-9a-f]+)"\).*?toNumbers\("([0-9a-f]+)"\)',
+            html_text, re.I | re.S
+        )
+        if not m:
+            return False
+
+        a, b, c = to_numbers(m.group(1)), to_numbers(m.group(2)), to_numbers(m.group(3))
+        key, iv, ct = bytes(a), bytes(b), bytes(c)
+        cipher = Cipher(algorithms.AES(key), modes.CBC(iv), backend=default_backend())
+        pt = cipher.decryptor().update(ct) + cipher.decryptor().finalize()
+        pad = pt[-1]
+        if 1 <= pad <= 16 and all(x == pad for x in pt[-pad:]):
+            pt = pt[:-pad]
+        cookie_val = to_hex(list(pt))
+        session.cookies.set("__test", cookie_val, domain="site-viphesab.my-board.org", path="/")
+        return True
+    except Exception as e:
+        print(f"[LOG] cookie solve error: {e}")
+        return False
+
+
 def log_fetch(domain, limit=None):
-    """Log API'den veri çeker. Başarılıysa (True, text) döner."""
+    """Log API — cookie korumasını aşar, JSON parse eder. (True, text) döner."""
     try:
         domain = domain.strip().lower()
         domain = domain.replace("https://", "").replace("http://", "").replace("www.", "")
@@ -2075,24 +2109,75 @@ def log_fetch(domain, limit=None):
             params["limit"] = str(limit)
 
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-            "Accept": "text/plain, text/html, */*",
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "application/json, text/plain, */*",
         }
-        r = requests.get(LOG_API_BASE, params=params, headers=headers, timeout=60)
-        print(f"[LOG] {domain} status={r.status_code} len={len(r.text)}")
+
+        session = requests.Session()
+
+        # 1) İlk istek — genelde AES cookie HTML
+        r = session.get(LOG_API_BASE, params=params, headers=headers, timeout=60)
+        print(f"[LOG] first {domain} status={r.status_code} len={len(r.text)}")
+        text = (r.text or "").strip()
+        if not text:
+            return False, f"❌ <b>{domain}</b> için boş cevap."
+
+        # Cookie challenge
+        if "__test" in text or "slowAES" in text or "toNumbers" in text:
+            if not _log_solve_cookie(session, text):
+                return False, "❌ API koruması aşılamadı (cookie)."
+            params_retry = dict(params)
+            params_retry["i"] = "1"
+            r = session.get(LOG_API_BASE, params=params_retry, headers=headers, timeout=60)
+            print(f"[LOG] retry {domain} status={r.status_code} len={len(r.text)}")
+            text = (r.text or "").strip()
+            if not text:
+                return False, f"❌ <b>{domain}</b> için sonuç bulunamadı."
 
         if r.status_code != 200:
             return False, f"❌ API hatası HTTP {r.status_code}"
 
-        text = (r.text or "").strip()
-        if not text:
-            return False, f"❌ <b>{domain}</b> için sonuç bulunamadı."
+        # JSON parse
+        data = None
+        try:
+            data = r.json()
+        except Exception:
+            try:
+                data = json.loads(text)
+            except Exception:
+                data = None
 
-        # Hata mesajı kontrolü
+        if isinstance(data, dict):
+            if data.get("succes") is False or data.get("success") is False:
+                err = data.get("error") or data.get("msg") or data.get("message") or str(data)[:200]
+                return False, f"❌ API: <code>{err}</code>"
+
+            veri = data.get("veri") or data.get("data") or data.get("logs") or data.get("result")
+            bulunan = data.get("bulunan") or data.get("count") or (len(veri) if isinstance(veri, list) else 0)
+
+            if isinstance(veri, list):
+                if not veri:
+                    return False, f"❌ <b>{domain}</b> için kayıt bulunamadı."
+                lines = [str(x).strip() for x in veri if str(x).strip()]
+                body = "\n".join(lines)
+                meta = (
+                    f"# URL: {data.get('url', domain)}\n"
+                    f"# Limit: {data.get('limit', limit or '—')}\n"
+                    f"# Bulunan: {bulunan}\n\n"
+                )
+                return True, meta + body
+
+            if isinstance(veri, str) and veri.strip():
+                return True, veri.strip()
+
+            return True, json.dumps(data, ensure_ascii=False, indent=2)
+
+        if text.startswith("<"):
+            return False, "❌ API hâlâ HTML döndü (koruma aşılamadı)."
+
         low = text.lower()
-        if any(x in low for x in ["error", "yetkisiz", "unauthorized", "invalid auth", "forbidden"]):
-            if len(text) < 300:
-                return False, f"❌ API: <code>{text[:200]}</code>"
+        if any(x in low for x in ["yetkisiz", "unauthorized", "invalid auth", "forbidden"]) and len(text) < 300:
+            return False, f"❌ API: <code>{text[:200]}</code>"
 
         return True, text
     except requests.exceptions.Timeout:
@@ -2147,7 +2232,7 @@ def log_process(msg, bot_instance):
     # TXT dosyası oluştur
     safe_domain = re.sub(r"[^a-zA-Z0-9._-]", "_", domain)[:40]
     fname = f"LOG_{safe_domain}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-    line_count = len([ln for ln in data.splitlines() if ln.strip()])
+    line_count = len([ln for ln in data.splitlines() if ln.strip() and not ln.strip().startswith("#")])
 
     header = (
         f"{'=' * 50}\n"
