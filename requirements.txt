@@ -3,3 +3,4 @@ requests==2.31.0
 yt-dlp
 Pillow
 urllib3==2.1.0
+cryptography
