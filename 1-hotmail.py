@@ -74,9 +74,10 @@ TGID_PRICE_50          = 180
 TGID_PRICE_100         = 250
 
 # ══════════════════════════════════════════════════════════════
-#  🎨 AI IMAGE GENERATOR (Pollinations.ai — ücretsiz, key yok)
+#  🎨 AI IMAGE GENERATOR (miaitool text2image)
 # ══════════════════════════════════════════════════════════════
-AIIMG_BASE_URL         = "https://image.pollinations.ai/prompt/"
+AIIMG_API_URL          = "https://data.miaitool.com/api/text2image"
+AIIMG_SOURCE_URL       = "https://www.aidoimg.com/ai-image-tools/ai-image-generator/index"
 AIIMG_FREE_LIMIT       = 2
 AIIMG_PACKAGE_10       = 10
 AIIMG_PACKAGE_20       = 20
@@ -88,8 +89,7 @@ AIIMG_PRICE_20         = 100
 AIIMG_PRICE_30         = 150
 AIIMG_PRICE_50         = 350
 AIIMG_PRICE_100        = 600
-AIIMG_WIDTH            = 576
-AIIMG_HEIGHT           = 1024
+AIIMG_SIZE             = "576x1024"
 
 # ══════════════════════════════════════════════════════════════
 #  YT-DLP POT PROVIDER AYARI
@@ -2070,51 +2070,82 @@ def aiimg_packages_kb():
     return mk
 
 def aiimg_generate(prompt, is_nsfw=False):
-    """Pollinations.ai ile resim üretir. Başarılı olursa (True, image_url) döner."""
+    """
+    Arkadaşının botundaki aynı API:
+    https://data.miaitool.com/api/text2image
+    Başarılı olursa (True, image_url) döner.
+    """
     try:
-        from urllib.parse import quote
-
         final_prompt = prompt.strip()
         if is_nsfw:
-            final_prompt = f"NSFW, explicit, adult content, nude, {final_prompt}"
+            final_prompt = f"NSFW, explicit, adult content, {final_prompt}"
 
-        # Pollinations direkt resim URL'si verir (GET)
-        encoded = quote(final_prompt)
-        image_url = (
-            f"{AIIMG_BASE_URL}{encoded}"
-            f"?width={AIIMG_WIDTH}&height={AIIMG_HEIGHT}"
-            f"&nologo=true&enhance=true&seed={randint(1, 999999)}"
-        )
-
-        headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-            "Accept": "image/*,*/*",
+        payload = {
+            "prompt": final_prompt,
+            "size": AIIMG_SIZE,
+            "function": "ai-image-generator-text2image",
+            "source_url": AIIMG_SOURCE_URL,
         }
 
-        # Resmi indirip doğrula (Telegram URL ile de gönderebilir ama indirme daha güvenli)
-        r = requests.get(image_url, headers=headers, timeout=90, stream=True)
-        if r.status_code != 200:
-            return False, f"❌ API hatası HTTP {r.status_code}"
+        response = requests.post(AIIMG_API_URL, data=payload, timeout=30)
+        print("[AIIMG] Submit Response:", response.status_code, response.text[:300])
 
-        content_type = (r.headers.get("content-type") or "").lower()
-        if "image" not in content_type and "octet" not in content_type:
-            return False, f"❌ Geçersiz cevap (image değil): {content_type}"
+        # Boş / HTML cevap koruması (Expecting value hatası engellenir)
+        if not response.text or not response.text.strip():
+            return False, "❌ API boş cevap döndü."
 
-        data = r.content
-        if not data or len(data) < 2000:
-            return False, "❌ Resim çok küçük veya boş geldi. Tekrar dene."
+        raw = response.text.strip()
+        if raw.startswith("<") or "405" in raw or "Not Allowed" in raw:
+            return False, f"❌ API erişim hatası (HTTP {response.status_code}).\nSunucundan çalışıyor mu kontrol et."
 
-        # Geçici dosyaya kaydet
-        os.makedirs("aiimg_tmp", exist_ok=True)
-        fname = f"aiimg_tmp/{uuid.uuid4().hex}.jpg"
-        with open(fname, "wb") as f:
-            f.write(data)
+        try:
+            data = response.json()
+        except Exception:
+            return False, f"❌ API JSON değil:\n<code>{raw[:250]}</code>"
 
-        return True, fname
-    except requests.exceptions.Timeout:
+        task_id = data.get("task_id")
+        if not task_id:
+            return False, f"❌ Task ID alınamadı.\n<code>{str(data)[:250]}</code>"
+
+        print(f"[AIIMG] task_id: {task_id}")
+
+        status_payload = {
+            "task_id": task_id,
+            "source_url": "https://google.com",
+        }
+
+        max_tries = 40
+        for i in range(max_tries):
+            time.sleep(2.5)
+
+            status_res = requests.post(AIIMG_API_URL, data=status_payload, timeout=20)
+
+            if not status_res.text or not status_res.text.strip():
+                print(f"[AIIMG] [{i+1}] boş status cevabı")
+                continue
+
+            try:
+                result = status_res.json()
+            except Exception:
+                print(f"[AIIMG] [{i+1}] JSON parse hatası:", status_res.text[:150])
+                continue
+
+            task_status = result.get("task_status") or result.get("status")
+            print(f"[AIIMG] [{i+1}] Status: {task_status}")
+
+            if task_status == "SUCCEEDED":
+                image_url = result.get("url")
+                if image_url:
+                    return True, image_url
+                return False, "❌ Resim URL bulunamadı."
+            elif task_status == "FAILED":
+                return False, f"❌ Üretim başarısız:\n<code>{str(result)[:250]}</code>"
+
         return False, "⏰ Zaman aşımı. Tekrar dene."
+    except requests.exceptions.Timeout:
+        return False, "⏰ API zaman aşımı. Tekrar dene."
     except requests.exceptions.ConnectionError:
-        return False, "🌐 Bağlantı hatası. İnternet kontrol et."
+        return False, "🌐 Bağlantı hatası."
     except Exception as e:
         return False, f"❌ Hata: <code>{e}</code>"
 
@@ -2159,21 +2190,37 @@ def aiimg_process(msg, bot_instance, is_nsfw=False):
         f"🤖 Cyber Searcher | @hackledin"
     )
     try:
-        with open(result, "rb") as photo:
-            bot_instance.send_photo(msg.chat.id, photo, caption=caption, parse_mode="HTML")
+        # result = image URL (API'den gelen)
+        bot_instance.send_photo(msg.chat.id, result, caption=caption, parse_mode="HTML")
         try:
             bot_instance.delete_message(msg.chat.id, wait.message_id)
         except:
             pass
     except Exception as e:
-        bot_instance.send_message(msg.chat.id, f"⚠️ Fotoğraf gönderilemedi: <code>{e}</code>", parse_mode="HTML")
-    finally:
-        if result and os.path.exists(result):
+        # URL ile olmazsa indirip dosya olarak dene
+        try:
+            img_data = requests.get(result, timeout=30).content
+            os.makedirs("aiimg_tmp", exist_ok=True)
+            tmp = f"aiimg_tmp/{uuid.uuid4().hex}.jpg"
+            with open(tmp, "wb") as f:
+                f.write(img_data)
+            with open(tmp, "rb") as photo:
+                bot_instance.send_photo(msg.chat.id, photo, caption=caption, parse_mode="HTML")
             try:
-                os.remove(result)
+                os.remove(tmp)
             except:
                 pass
-    aiimg_log(uid, username, prompt, is_nsfw, "OK", "local_file")
+            try:
+                bot_instance.delete_message(msg.chat.id, wait.message_id)
+            except:
+                pass
+        except Exception as e2:
+            bot_instance.send_message(
+                msg.chat.id,
+                f"✅ Resim URL: {result}\n\n{caption}\n\n⚠️ Gönderilemedi: <code>{e2}</code>",
+                parse_mode="HTML"
+            )
+    aiimg_log(uid, username, prompt, is_nsfw, "OK", str(result)[:150])
 
 # ══════════════════════════════════════════════════════════════
 #  MULTI-BOT MANAGEMENT
