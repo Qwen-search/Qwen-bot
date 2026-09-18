@@ -2545,6 +2545,9 @@ _PROC_LOCK = threading.Lock()
 
 def _get_python_exe(): return sys.executable
 
+# Kullanıcı adım durumları (next_step kaybolmasın diye)
+USER_STATES = {}  # user_id -> {"action": "addbot"|"php2py", ...}
+
 def _load_registry():
     if not os.path.exists(BOT_REGISTRY_FILE): return {}
     try:
@@ -2555,27 +2558,127 @@ def _save_registry(registry):
     with open(BOT_REGISTRY_FILE, "w", encoding="utf-8") as f:
         json.dump(registry, f, indent=2)
 
+def _validate_bot_token(token):
+    """Telegram getMe ile token doğrula. (ok, info_or_error)"""
+    try:
+        r = requests.get(f"https://api.telegram.org/bot{token}/getMe", timeout=15)
+        data = r.json()
+        if data.get("ok") and data.get("result"):
+            return True, data["result"]
+        return False, data.get("description") or "Geçersiz token"
+    except Exception as e:
+        return False, str(e)
+
 def _spawn_bot(token, owner_id=None):
     if token == BOT_TOKEN:
-        print(f"[SPAWN] ⚠️ Ana bot token'ı spawn edilemez!"); return False
+        print(f"[SPAWN] ⚠️ Ana bot token'ı spawn edilemez!")
+        return False, "Ana bot token'ı eklenemez"
+    ok, info = _validate_bot_token(token)
+    if not ok:
+        return False, f"Token geçersiz: {info}"
     with _PROC_LOCK:
         if token in _CHILD_PROCS:
-            if _CHILD_PROCS[token].poll() is None: return False
+            if _CHILD_PROCS[token].poll() is None:
+                return False, "Bu token zaten çalışıyor"
         script_path = os.path.abspath(__file__)
         python_exe = _get_python_exe()
         args = [python_exe, script_path, "--bot", token, "--owner", str(owner_id)]
         try:
-            proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
-                                    stdin=subprocess.DEVNULL,
-                                    creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
-                                    start_new_session=True)
+            proc = subprocess.Popen(
+                args,
+                stdout=subprocess.DEVNULL,
+                stderr=subprocess.DEVNULL,
+                stdin=subprocess.DEVNULL,
+                creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
+                start_new_session=True,
+            )
+            time.sleep(1.5)
+            if proc.poll() is not None:
+                # Process hemen çıktı — yine de registry'ye kaydet
+                print(f"[SPAWN] Process exited early code={proc.poll()}")
             _CHILD_PROCS[token] = proc
             registry = _load_registry()
-            registry[token] = {"owner_id": owner_id, "pid": proc.pid, "added": datetime.now().isoformat()}
+            registry[token] = {
+                "owner_id": owner_id,
+                "pid": proc.pid,
+                "username": info.get("username", ""),
+                "first_name": info.get("first_name", ""),
+                "added": datetime.now().isoformat(),
+            }
             _save_registry(registry)
-            return True
+            uname = info.get("username") or info.get("first_name") or "bot"
+            return True, uname
         except Exception as e:
-            print(f"[ERROR] Failed to spawn bot: {e}"); return False
+            print(f"[ERROR] Failed to spawn bot: {e}")
+            return False, str(e)
+
+def _php_to_python(php_code):
+    """Temel PHP → Python çevirisi (yaygın yapılar)."""
+    code = php_code
+    # Tag temizle
+    code = re.sub(r"<\?php\s*", "", code, flags=re.I)
+    code = re.sub(r"<\?\s*", "", code)
+    code = re.sub(r"\?>", "", code)
+    # Yorumlar
+    code = re.sub(r"//(.*?)$", r"#\1", code, flags=re.M)
+    code = re.sub(r"/\*(.*?)\*/", lambda m: "\n".join("# " + ln for ln in m.group(1).splitlines()), code, flags=re.S)
+    # echo / print
+    code = re.sub(r"\becho\s+", "print(", code)
+    code = re.sub(r"\bprint\s+", "print(", code)
+    # Satır sonu ; sonrası print kapanışı kabaca
+    lines = []
+    for line in code.splitlines():
+        stripped = line.rstrip()
+        if "print(" in stripped and stripped.endswith(";"):
+            # print(xxx;  → print(xxx)
+            stripped = stripped[:-1]
+            if stripped.count("(") > stripped.count(")"):
+                stripped += ")"
+            line = stripped
+        elif stripped.endswith(";"):
+            line = stripped[:-1]
+        lines.append(line)
+    code = "\n".join(lines)
+    # $degisken → degisken
+    code = re.sub(r"\$([a-zA-Z_][a-zA-Z0-9_]*)", r"\1", code)
+    # -> → .
+    code = code.replace("->", ".")
+    # . birleştirme (basit string)
+    code = re.sub(r'"\s*\.\s*"', "", code)
+    code = re.sub(r"'\s*\.\s*'", "", code)
+    code = re.sub(r'(\w+)\s*\.\s*"', r'\1 + "', code)
+    code = re.sub(r'"\s*\.\s*(\w+)', r'" + \1', code)
+    # array(...) → [...]
+    code = re.sub(r"\barray\s*\(([^)]*)\)", r"[\1]", code)
+    # true/false/null
+    code = re.sub(r"\btrue\b", "True", code, flags=re.I)
+    code = re.sub(r"\bfalse\b", "False", code, flags=re.I)
+    code = re.sub(r"\bnull\b", "None", code, flags=re.I)
+    # function name($a) { → def name(a):
+    code = re.sub(
+        r"\bfunction\s+([a-zA-Z_][a-zA-Z0-9_]*)\s*\(([^)]*)\)\s*\{",
+        lambda m: f"def {m.group(1)}({m.group(2)}):",
+        code,
+    )
+    # if (x) { → if x:
+    code = re.sub(r"\bif\s*\(([^)]+)\)\s*\{", r"if \1:", code)
+    code = re.sub(r"\belseif\s*\(([^)]+)\)\s*\{", r"elif \1:", code)
+    code = re.sub(r"\belse\s*\{", "else:", code)
+    code = re.sub(r"\bwhile\s*\(([^)]+)\)\s*\{", r"while \1:", code)
+    code = re.sub(r"\bforeach\s*\(\s*(\w+)\s+as\s+(\w+)\s*\)\s*\{", r"for \2 in \1:", code)
+    code = re.sub(r"\bfor\s*\(([^)]+)\)\s*\{", r"for \1:  # TODO: PHP for", code)
+    # === → ==, !== → !=
+    code = code.replace("===", "==").replace("!==", "!=")
+    # Süslü parantezleri kaldır (basit)
+    code = code.replace("{", "").replace("}", "")
+    # return
+    code = re.sub(r"\breturn\b", "return", code)
+    header = (
+        "# -*- coding: utf-8 -*-\n"
+        "# Converted from PHP by 🕵🏻 Cyber Search\n"
+        "# Not: Otomatik çeviri — elle kontrol et!\n\n"
+    )
+    return header + code.strip() + "\n"
 
 def start_saved_bots():
     registry = _load_registry()
@@ -3831,25 +3934,16 @@ def register_handlers(bot_instance):
         uid = msg.from_user.id
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
-        parts = msg.text.split()
+        parts = msg.text.split(maxsplit=1)
         if len(parts) < 2:
-            bot_instance.reply_to(msg, s(uid, "multi_bot_add_usage")); return
-        token = parts[1].strip()
-        if len(token) < 30:
-            bot_instance.reply_to(msg, "❌ Geçersiz token formatı!"); return
-        if token == BOT_TOKEN:
-            bot_instance.reply_to(msg, "❌ Ana botun token'ı eklenemez!"); return
-        with _PROC_LOCK:
-            if token in _CHILD_PROCS and _CHILD_PROCS[token].poll() is None:
-                bot_instance.reply_to(msg, s(uid, "multi_bot_exists")); return
-            try:
-                success = _spawn_bot(token, uid)
-                if success:
-                    bot_instance.reply_to(msg, s(uid, "multi_bot_added", token=token[:20] + "...",
-                                                 owner=msg.from_user.first_name or str(uid)))
-                else: bot_instance.reply_to(msg, "❌ Bot başlatılamadı!")
-            except Exception as e:
-                bot_instance.reply_to(msg, f"❌ Hata: {e}")
+            USER_STATES[uid] = {"action": "addbot"}
+            bot_instance.reply_to(
+                msg,
+                "🤖 <b>Bot Ekle</b>\nToken'ı gönder:\n<code>123456:AAHxxxx</code>",
+                parse_mode="HTML"
+            )
+            return
+        _process_addbot(msg, bot_instance)
 
     @bot_instance.message_handler(commands=["video"])
     def cmd_video(msg):
@@ -3934,6 +4028,20 @@ def register_handlers(bot_instance):
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+
+        # ── PHP → Python ──
+        state = USER_STATES.get(uid, {})
+        if msg.content_type == "document":
+            doc = msg.document
+            fname = (doc.file_name or "").lower()
+            is_php = fname.endswith(".php") or (doc.mime_type or "") in (
+                "application/x-php", "text/x-php", "application/php", "text/php"
+            )
+            if state.get("action") == "php2py" or is_php:
+                USER_STATES.pop(uid, None)
+                _handle_php2py_document(msg, bot_instance)
+                return
+
         caption = (msg.caption or "").strip().lower()
         exif_trigger = any(caption == t or caption.startswith(t + " ") for t in ("/exif","/meta","/foto","exif","meta"))
         if msg.content_type == "document":
@@ -3982,6 +4090,21 @@ def register_handlers(bot_instance):
         uid = msg.from_user.id
         if is_banned(uid):
             bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        # State: Bot Ekle token bekleniyor
+        st = USER_STATES.get(uid)
+        if st and st.get("action") == "addbot":
+            USER_STATES.pop(uid, None)
+            _process_addbot(msg, bot_instance)
+            return
+        # State: PHP kodu metin olarak gönderildi
+        if st and st.get("action") == "php2py":
+            USER_STATES.pop(uid, None)
+            php_src = msg.text or ""
+            if "<?" not in php_src and "function" not in php_src.lower() and "$" not in php_src:
+                bot_instance.reply_to(msg, "❌ PHP kodu veya .php dosyası gönder.")
+                return
+            _send_php2py_result(msg, bot_instance, php_src, "code.php")
+            return
         txt = msg.text
         keys = MENU_KEYS.get(lang(uid), MENU_KEYS["tr"])
         if txt == keys.get("combo"):
@@ -4342,16 +4465,32 @@ def register_handlers(bot_instance):
                     except: pass
                 return
             if data == "tool_addbot":
-                prompt = TOOL_PROMPTS.get(lang(uid), TOOL_PROMPTS["tr"]).get("addbot")
-                m = bot_instance.send_message(call.message.chat.id, prompt)
-                bot_instance.register_next_step_handler(m, lambda m: _process_addbot(m, bot_instance))
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
+                USER_STATES[uid] = {"action": "addbot"}
+                bot_instance.send_message(
+                    call.message.chat.id,
+                    "🤖 <b>Bot Ekle</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Bot Token'ını gönder:\n\n"
+                    "📌 Örnek:\n<code>8369544888:AAHxxxxxxxxxxxxxxxxxxxxxxx</code>\n\n"
+                    "⚠️ Token BotFather'dan alınır.\n"
+                    "Ana bot token'ı eklenemez.",
+                    parse_mode="HTML"
+                )
                 return
             if data == "tool_php2py":
-                bot_instance.send_message(call.message.chat.id, s(uid, "php2py"))
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
+                USER_STATES[uid] = {"action": "php2py"}
+                bot_instance.send_message(
+                    call.message.chat.id,
+                    "🐍 <b>PHP → Python Çevirici</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    "• <b>.php dosyası</b> gönder\n"
+                    "• veya PHP kodunu <b>metin</b> olarak yaz\n\n"
+                    "📌 Desteklenen: echo, değişken, function, if/else, array…\n"
+                    "⚠️ Otomatik çeviri — sonucu kontrol et!",
+                    parse_mode="HTML"
+                )
                 return
             if data == "tool_smsbomb":
                 with _SMS_LOCK:
@@ -4477,7 +4616,19 @@ def register_handlers(bot_instance):
                 elif key == "predunyam":
                     _run_predunyam(call.message.chat.id, uid, bot_instance)
                 elif key == "php2py":
-                    bot_instance.send_message(call.message.chat.id, s(uid, "php2py"))
+                    USER_STATES[uid] = {"action": "php2py"}
+                    bot_instance.send_message(
+                        call.message.chat.id,
+                        "🐍 <b>PHP → Python</b>\n.php dosyası veya PHP kodu gönder.",
+                        parse_mode="HTML"
+                    )
+                elif key == "addbot":
+                    USER_STATES[uid] = {"action": "addbot"}
+                    bot_instance.send_message(
+                        call.message.chat.id,
+                        "🤖 Bot Token gönder:\n<code>123456:AAHxxx</code>",
+                        parse_mode="HTML"
+                    )
                 elif key in ("proxycheck","urlscan"):
                     prompt = TOOL_PROMPTS.get(lang(uid), TOOL_PROMPTS["tr"]).get(key)
                     m = bot_instance.send_message(call.message.chat.id, prompt)
@@ -4998,21 +5149,108 @@ def _send_txt_result(chat_id, status_mid, bot_instance, fname, content, caption)
 
 def _process_addbot(msg, bot_instance):
     uid = msg.from_user.id
-    token = msg.text.strip()
-    if len(token) < 30:
-        bot_instance.reply_to(msg, "❌ Geçersiz token formatı!"); return
+    token = (msg.text or "").strip()
+    # /addbot TOKEN formatı da gelsin
+    if token.startswith("/addbot"):
+        parts = token.split(maxsplit=1)
+        token = parts[1].strip() if len(parts) > 1 else ""
+    if ":" not in token or len(token) < 30:
+        bot_instance.reply_to(
+            msg,
+            "❌ Geçersiz token formatı!\n"
+            "Örnek: <code>123456789:AAHxxxxxxxx</code>",
+            parse_mode="HTML"
+        )
+        return
     if token == BOT_TOKEN:
-        bot_instance.reply_to(msg, "❌ Ana botun token'ı eklenemez!"); return
-    with _PROC_LOCK:
-        if token in _CHILD_PROCS and _CHILD_PROCS[token].poll() is None:
-            bot_instance.reply_to(msg, s(uid, "multi_bot_exists")); return
+        bot_instance.reply_to(msg, "❌ Ana botun token'ı eklenemez!")
+        return
+    wait = bot_instance.reply_to(msg, "⏳ Token doğrulanıyor ve bot başlatılıyor...")
+    try:
+        success, info = _spawn_bot(token, uid)
+        if success:
+            bot_instance.edit_message_text(
+                f"✅ <b>Bot eklendi!</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🤖 Bot: <b>@{info}</b>\n"
+                f"🔑 Token: <code>{token[:15]}...{token[-6:]}</code>\n"
+                f"👤 Sahip: {msg.from_user.first_name or uid}\n"
+                f"📌 Durum: 🟢 Çalışıyor\n\n"
+                f"<i>Bot aynı özelliklerle ayağa kalktı.</i>",
+                msg.chat.id, wait.message_id, parse_mode="HTML"
+            )
+        else:
+            bot_instance.edit_message_text(
+                f"❌ <b>Bot eklenemedi</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                f"Sebep: <code>{info}</code>\n\n"
+                f"• Token doğru mu?\n"
+                f"• BotFather'da bot silinmedi mi?\n"
+                f"• Railway'de process limit olabilir",
+                msg.chat.id, wait.message_id, parse_mode="HTML"
+            )
+    except Exception as e:
         try:
-            success = _spawn_bot(token, uid)
-            if success:
-                bot_instance.reply_to(msg, s(uid, "multi_bot_added", token=token[:20] + "...",
-                                             owner=msg.from_user.first_name or str(uid)))
-            else: bot_instance.reply_to(msg, "❌ Bot başlatılamadı!")
-        except Exception as e: bot_instance.reply_to(msg, f"❌ Hata: {e}")
+            bot_instance.edit_message_text(f"❌ Hata: <code>{e}</code>", msg.chat.id, wait.message_id, parse_mode="HTML")
+        except:
+            bot_instance.reply_to(msg, f"❌ Hata: {e}")
+
+
+def _handle_php2py_document(msg, bot_instance):
+    uid = msg.from_user.id
+    doc = msg.document
+    fname = doc.file_name or "code.php"
+    wait = bot_instance.reply_to(msg, "🔄 PHP → Python çevriliyor...")
+    try:
+        file_info = bot_instance.get_file(doc.file_id)
+        raw = bot_instance.download_file(file_info.file_path)
+        try:
+            php_src = raw.decode("utf-8")
+        except UnicodeDecodeError:
+            php_src = raw.decode("latin-1", errors="ignore")
+        if not php_src.strip():
+            bot_instance.edit_message_text("❌ Dosya boş.", msg.chat.id, wait.message_id)
+            return
+        _send_php2py_result(msg, bot_instance, php_src, fname, wait_id=wait.message_id)
+    except Exception as e:
+        try:
+            bot_instance.edit_message_text(f"❌ {e}", msg.chat.id, wait.message_id)
+        except:
+            bot_instance.reply_to(msg, f"❌ {e}")
+
+
+def _send_php2py_result(msg, bot_instance, php_src, fname="code.php", wait_id=None):
+    try:
+        py_code = _php_to_python(php_src)
+        out_name = re.sub(r"\.php$", "", fname, flags=re.I) + ".py"
+        if not out_name.endswith(".py"):
+            out_name += ".py"
+        path = f"/tmp/{uuid.uuid4().hex}_{out_name}"
+        with open(path, "w", encoding="utf-8") as f:
+            f.write(py_code)
+        caption = (
+            f"✅ <b>PHP → Python tamamlandı</b>\n"
+            f"📄 Kaynak: <code>{fname}</code>\n"
+            f"🐍 Çıktı: <code>{out_name}</code>\n"
+            f"⚠️ Elle kontrol etmen önerilir."
+        )
+        with open(path, "rb") as f:
+            bot_instance.send_document(msg.chat.id, f, caption=caption, parse_mode="HTML")
+        if wait_id:
+            try:
+                bot_instance.delete_message(msg.chat.id, wait_id)
+            except:
+                pass
+        try:
+            os.remove(path)
+        except:
+            pass
+    except Exception as e:
+        if wait_id:
+            try:
+                bot_instance.edit_message_text(f"❌ Çeviri hatası: <code>{e}</code>", msg.chat.id, wait_id, parse_mode="HTML")
+                return
+            except:
+                pass
+        bot_instance.reply_to(msg, f"❌ Çeviri hatası: {e}")
 
 def _process_special_tool(msg, tool, bot_instance):
     uid = msg.from_user.id
