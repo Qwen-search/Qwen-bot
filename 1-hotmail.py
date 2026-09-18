@@ -74,10 +74,12 @@ TGID_PRICE_50          = 180
 TGID_PRICE_100         = 250
 
 # ══════════════════════════════════════════════════════════════
-#  🎨 AI IMAGE GENERATOR (miaitool text2image)
+#  🎨 AI IMAGE GENERATOR
+#  Primary: miaitool (arkadaş API) | Fallback: Pollinations (Railway uyumlu)
 # ══════════════════════════════════════════════════════════════
 AIIMG_API_URL          = "https://data.miaitool.com/api/text2image"
 AIIMG_SOURCE_URL       = "https://www.aidoimg.com/ai-image-tools/ai-image-generator/index"
+AIIMG_FALLBACK_URL     = "https://image.pollinations.ai/prompt/"
 AIIMG_FREE_LIMIT       = 2
 AIIMG_PACKAGE_10       = 10
 AIIMG_PACKAGE_20       = 20
@@ -90,6 +92,8 @@ AIIMG_PRICE_30         = 150
 AIIMG_PRICE_50         = 350
 AIIMG_PRICE_100        = 600
 AIIMG_SIZE             = "576x1024"
+AIIMG_WIDTH            = 576
+AIIMG_HEIGHT           = 1024
 
 # ══════════════════════════════════════════════════════════════
 #  YT-DLP POT PROVIDER AYARI
@@ -2069,81 +2073,112 @@ def aiimg_packages_kb():
     mk.add(_btn("◀️ Geri", "tool_aiimg"))
     return mk
 
+def _aiimg_miaitool(prompt):
+    """Arkadaş API — normal VPS'te çalışır, Railway'de genelde 405 verir."""
+    payload = {
+        "prompt": prompt,
+        "size": AIIMG_SIZE,
+        "function": "ai-image-generator-text2image",
+        "source_url": AIIMG_SOURCE_URL,
+    }
+    response = requests.post(AIIMG_API_URL, data=payload, timeout=25)
+    print("[AIIMG] miaitool submit:", response.status_code, (response.text or "")[:200])
+
+    if response.status_code == 405 or not response.text or not response.text.strip():
+        return None  # fallback'e düş
+    raw = response.text.strip()
+    if raw.startswith("<") or "Not Allowed" in raw:
+        return None
+
+    try:
+        data = response.json()
+    except Exception:
+        return None
+
+    task_id = data.get("task_id")
+    if not task_id:
+        return None
+
+    print(f"[AIIMG] miaitool task_id: {task_id}")
+    status_payload = {"task_id": task_id, "source_url": "https://google.com"}
+
+    for i in range(40):
+        time.sleep(2.5)
+        try:
+            status_res = requests.post(AIIMG_API_URL, data=status_payload, timeout=20)
+            if not status_res.text or not status_res.text.strip():
+                continue
+            result = status_res.json()
+        except Exception:
+            continue
+
+        task_status = result.get("task_status") or result.get("status")
+        print(f"[AIIMG] miaitool [{i+1}] {task_status}")
+
+        if task_status == "SUCCEEDED":
+            url = result.get("url")
+            return url if url else None
+        if task_status == "FAILED":
+            return None
+    return None
+
+
+def _aiimg_pollinations(prompt):
+    """Railway / cloud uyumlu fallback — her yerden çalışır."""
+    from urllib.parse import quote
+    encoded = quote(prompt)
+    image_url = (
+        f"{AIIMG_FALLBACK_URL}{encoded}"
+        f"?width={AIIMG_WIDTH}&height={AIIMG_HEIGHT}"
+        f"&nologo=true&enhance=true&seed={randint(1, 999999)}"
+    )
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Accept": "image/*,*/*",
+    }
+    r = requests.get(image_url, headers=headers, timeout=90)
+    print("[AIIMG] pollinations:", r.status_code, r.headers.get("content-type"), len(r.content))
+    if r.status_code != 200 or len(r.content) < 2000:
+        return None
+
+    # Dosyaya kaydet, Telegram'a dosya olarak gidecek
+    os.makedirs("aiimg_tmp", exist_ok=True)
+    fname = f"aiimg_tmp/{uuid.uuid4().hex}.jpg"
+    with open(fname, "wb") as f:
+        f.write(r.content)
+    return fname
+
+
 def aiimg_generate(prompt, is_nsfw=False):
     """
-    Arkadaşının botundaki aynı API:
-    https://data.miaitool.com/api/text2image
-    Başarılı olursa (True, image_url) döner.
+    1) Önce arkadaş API (miaitool) dener
+    2) 405 / hata olursa Pollinations fallback (Railway için)
+    Dönüş: (True, url_veya_dosya_yolu) veya (False, hata_mesajı)
     """
     try:
         final_prompt = prompt.strip()
         if is_nsfw:
             final_prompt = f"NSFW, explicit, adult content, {final_prompt}"
 
-        payload = {
-            "prompt": final_prompt,
-            "size": AIIMG_SIZE,
-            "function": "ai-image-generator-text2image",
-            "source_url": AIIMG_SOURCE_URL,
-        }
-
-        response = requests.post(AIIMG_API_URL, data=payload, timeout=30)
-        print("[AIIMG] Submit Response:", response.status_code, response.text[:300])
-
-        # Boş / HTML cevap koruması (Expecting value hatası engellenir)
-        if not response.text or not response.text.strip():
-            return False, "❌ API boş cevap döndü."
-
-        raw = response.text.strip()
-        if raw.startswith("<") or "405" in raw or "Not Allowed" in raw:
-            return False, f"❌ API erişim hatası (HTTP {response.status_code}).\nSunucundan çalışıyor mu kontrol et."
-
+        # 1) Miaitool dene
         try:
-            data = response.json()
-        except Exception:
-            return False, f"❌ API JSON değil:\n<code>{raw[:250]}</code>"
+            result = _aiimg_miaitool(final_prompt)
+            if result:
+                print("[AIIMG] ✅ miaitool başarılı")
+                return True, result
+        except Exception as e:
+            print(f"[AIIMG] miaitool hata: {e}")
 
-        task_id = data.get("task_id")
-        if not task_id:
-            return False, f"❌ Task ID alınamadı.\n<code>{str(data)[:250]}</code>"
+        # 2) Fallback: Pollinations (Railway'de çalışır)
+        print("[AIIMG] → Pollinations fallback...")
+        result = _aiimg_pollinations(final_prompt)
+        if result:
+            print("[AIIMG] ✅ pollinations başarılı")
+            return True, result
 
-        print(f"[AIIMG] task_id: {task_id}")
-
-        status_payload = {
-            "task_id": task_id,
-            "source_url": "https://google.com",
-        }
-
-        max_tries = 40
-        for i in range(max_tries):
-            time.sleep(2.5)
-
-            status_res = requests.post(AIIMG_API_URL, data=status_payload, timeout=20)
-
-            if not status_res.text or not status_res.text.strip():
-                print(f"[AIIMG] [{i+1}] boş status cevabı")
-                continue
-
-            try:
-                result = status_res.json()
-            except Exception:
-                print(f"[AIIMG] [{i+1}] JSON parse hatası:", status_res.text[:150])
-                continue
-
-            task_status = result.get("task_status") or result.get("status")
-            print(f"[AIIMG] [{i+1}] Status: {task_status}")
-
-            if task_status == "SUCCEEDED":
-                image_url = result.get("url")
-                if image_url:
-                    return True, image_url
-                return False, "❌ Resim URL bulunamadı."
-            elif task_status == "FAILED":
-                return False, f"❌ Üretim başarısız:\n<code>{str(result)[:250]}</code>"
-
-        return False, "⏰ Zaman aşımı. Tekrar dene."
+        return False, "❌ Resim üretilemedi. Her iki API de cevap vermedi. Tekrar dene."
     except requests.exceptions.Timeout:
-        return False, "⏰ API zaman aşımı. Tekrar dene."
+        return False, "⏰ Zaman aşımı. Tekrar dene."
     except requests.exceptions.ConnectionError:
         return False, "🌐 Bağlantı hatası."
     except Exception as e:
@@ -2190,36 +2225,31 @@ def aiimg_process(msg, bot_instance, is_nsfw=False):
         f"🤖 Cyber Searcher | @hackledin"
     )
     try:
-        # result = image URL (API'den gelen)
-        bot_instance.send_photo(msg.chat.id, result, caption=caption, parse_mode="HTML")
+        # result = yerel dosya yolu VEYA http URL
+        if isinstance(result, str) and result.startswith("http"):
+            bot_instance.send_photo(msg.chat.id, result, caption=caption, parse_mode="HTML")
+        elif isinstance(result, str) and os.path.exists(result):
+            with open(result, "rb") as photo:
+                bot_instance.send_photo(msg.chat.id, photo, caption=caption, parse_mode="HTML")
+        else:
+            bot_instance.send_photo(msg.chat.id, result, caption=caption, parse_mode="HTML")
         try:
             bot_instance.delete_message(msg.chat.id, wait.message_id)
         except:
             pass
     except Exception as e:
-        # URL ile olmazsa indirip dosya olarak dene
-        try:
-            img_data = requests.get(result, timeout=30).content
-            os.makedirs("aiimg_tmp", exist_ok=True)
-            tmp = f"aiimg_tmp/{uuid.uuid4().hex}.jpg"
-            with open(tmp, "wb") as f:
-                f.write(img_data)
-            with open(tmp, "rb") as photo:
-                bot_instance.send_photo(msg.chat.id, photo, caption=caption, parse_mode="HTML")
+        bot_instance.send_message(
+            msg.chat.id,
+            f"⚠️ Fotoğraf gönderilemedi: <code>{e}</code>\n\n{caption}",
+            parse_mode="HTML"
+        )
+    finally:
+        # Geçici dosyayı sil
+        if isinstance(result, str) and result.startswith("aiimg_tmp") and os.path.exists(result):
             try:
-                os.remove(tmp)
+                os.remove(result)
             except:
                 pass
-            try:
-                bot_instance.delete_message(msg.chat.id, wait.message_id)
-            except:
-                pass
-        except Exception as e2:
-            bot_instance.send_message(
-                msg.chat.id,
-                f"✅ Resim URL: {result}\n\n{caption}\n\n⚠️ Gönderilemedi: <code>{e2}</code>",
-                parse_mode="HTML"
-            )
     aiimg_log(uid, username, prompt, is_nsfw, "OK", str(result)[:150])
 
 # ══════════════════════════════════════════════════════════════
