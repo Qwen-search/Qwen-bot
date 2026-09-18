@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 # ╔══════════════════════════════════════════════════════════╗
-# ║         CYBER SEARCHER v4.4 — FULL PRODUCTION           ║
+# ║         🕵🏻 Cyber Search — FULL PRODUCTION               ║
 # ║              Developer: @hackledin                       ║
 # ║  🎵 Müzik + 🎥 Video (POT ile Bot Koruması Aşıldı)      ║
 # ║  🆔 Telegram ID Sorgu (gettg.id API) — DÜZELTİLDİ!      ║
@@ -1046,7 +1046,7 @@ def tgid_build_txt_report(username, data, queried_by=""):
     lines.append(sep)
     lines.append(" 📌 Bu rapor @hackledin API'si kullanılarak oluşturuldu.")
     lines.append(" 👨‍💻 Developer : @hackledin")
-    lines.append(" 🛡️ Cyber Searcher v4.4")
+    lines.append(" 🛡️ 🕵🏻 Cyber Search")
     lines.append(sep)
     return "\n".join(lines)
 
@@ -1298,7 +1298,7 @@ def _exif_mesaj_olustur(d):
         msg += f"🗺 <b>Harita:</b> <a href='{d['harita']}'>Google Maps'te Gör</a>\n"
     else:
         msg += f"📍 <b>GPS:</b> <code>Konum verisi bulunamadı</code>\n"
-    msg += f"{'━' * 28}\n🤖 <i>Cyber Searcher v4.4 | @hackledin</i>"
+    msg += f"{'━' * 28}\n🤖 <i>🕵🏻 Cyber Search | @hackledin</i>"
     return msg
 
 # ══════════════════════════════════════════════════════════════
@@ -1671,7 +1671,7 @@ def s(user_id, key, **kw):
 # ══════════════════════════════════════════════════════════════
 S = {
     "tr": {
-        "welcome": "🌟 <b>Cyber Searcher v4.4</b>\nHoşgeldin, <b>{name}</b>!\n📌 Durum: {status}\n🔻 Aşağıdan işlem seç:",
+        "welcome": "<b>🕵🏻 Cyber Search</b>\nHoşgeldin, <b>{name}</b>!\n📌 Durum: {status}\n🔻 Aşağıdan işlem seç:",
         "free": "🆓 Ücretsiz", "premium": "⭐ PREMIUM",
         "select_op": "🛠 Kullanmak istediğin aracı seç:",
         "combo_ask": "🌐 Domain gir (Örn: netflix.com) veya (netflix.com 100):",
@@ -1738,87 +1738,65 @@ S = {
         "php2py_only": "❌ Sadece PHP dosyası gönder!",
         "php2py_no_token": "❌ API token alınamadı.",
         "help_content": (
-            "📖 **YARDIM MENÜSÜ (v4.4)**\n"
-            "📌 Durumunuz: {status}\n"
-            "══════════════════════\n"
-            "🔹 **SORGU SİSTEMLERİ** (🆓 ÜCRETSİZ):\n"
-            "   • 🆔 TC Sorgu\n"
-            "   • 🔍 TC Pro Sorgu\n"
-            "   • 👤 Ad Soyad Sorgu\n"
-            "   • 👨‍👩‍👧 Aile Sorgu\n"
-            "   • 👨‍👩‍👧‍👦 Aile Pro Sorgu\n"
-            "   • 🌳 Sülale Sorgu\n"
-            "   • 📱 TC'den GSM\n"
-            "   • 📞 GSM'den TC\n"
-            "   • 🚗 Plaka Sorgu\n"
-            "   • 🎓 E-Okul Sorgu\n"
-            "   • 🏠 Tapu Sorgu\n"
-            "   • 🗺️ Ada Parsel Sorgu\n"
-            "   • 🏠 Adres Sorgu\n"
-            "🔹 **🆔 TELEGRAM ID SORGU**:\n"
-            "   • 🆓 Free: 5 sorgu\n"
-            "   • 💰 Bakiye: 25→89⭐ / 50→180⭐ / 100→250⭐\n"
-            "   • ⭐ Premium: Sınırsız\n"
-            "🔹 **⭐ PREMIUM PAKETLER:**\n"
-            "   • 🌟 Premium (400 Yıldız) → Sınırsız Hotmail + Capture + Keyword + TG-ID\n"
-            "   • 🌍 OSINT Premium (200 Yıldız) → LeakSights OSINT (30+ Sorgu)\n"
-            "🔹 **DİĞER ARAÇLAR** (🆓 ÜCRETSİZ):\n"
-            "   • 📦 Combo Çekme\n"
-            "   • 🎥 Video İndirme ✅\n"
-            "   • 🎵 Müzik İndirme ✅\n"
-            "   • 💳 CC Generator\n"
-            "   • 🤖 Discord Token Kontrol\n"
-            "   • ✈️ Telegram Token Kontrol\n"
-            "   • 🌐 IP Bilgi\n"
-            "   • 🔎 DNS Sorgu\n"
-            "   • ⚽ Bahis Sorgu\n"
-            "   • 💊 Eczane Sorgu\n"
-            "   • 🛡️ Proxy Check\n"
-            "   • 🔍 URL Scan\n"
-            "   • 🐍 PHP→Python Çevirici\n"
-            "   • 💣 SMS Bomber - 41+ Servis ✅\n"
-            "   • 📧 Hotmail Checker - Free 3000 satır\n"
-            "   • 📸 Capture Tool - Free 3 kullanım\n"
-            "   • 📸 EXIF Metadata Analizi ✅\n"
-            "   • 🎨 AI Image Generator ✅ (Free 2 hak | +18 ayrı)\n"
-            "   • 📂 Log Çekme ✅ (Free 3 hak / max 100 | Premium 600⭐)\n"
-            "👨‍💻 coded by: @hackledin"
+            "📖 <b>YARDIM — 🕵🏻 Cyber Search</b>\n"
+            "📌 Durum: <b>{status}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🇹🇷 <b>TÜRKİYE SORGULARI</b> · Ücretsiz\n"
+            "TC · TC Pro · Ad Soyad · Aile · Aile Pro\n"
+            "Sülale · TC→GSM · GSM→TC · Plaka\n"
+            "E-Okul · Tapu · Ada Parsel · Adres\n\n"
+            "🛠 <b>ARAÇLAR</b>\n"
+            "📦 Combo · 📧 Hotmail · 📸 Capture\n"
+            "🎥 Video · 🎵 Müzik · 💣 SMS Bomber\n"
+            "🌐 IP · 🔎 DNS · 🛡️ Proxy · 🔍 URL Scan\n"
+            "💳 CC Gen · 🤖 Discord/TG Token\n"
+            "💊 Eczane · ⚽ Bahis · 📸 EXIF · 🐍 PHP→Py\n\n"
+            "🆔 <b>TELEGRAM ID</b>\n"
+            "Free 5 · Paket 25/50/100 sorgu · Premium sınırsız\n\n"
+            "🎨 <b>AI IMAGE</b>\n"
+            "Free 2 hak · +18 ayrı · Yıldız ile paket\n\n"
+            "📂 <b>LOG ÇEKME</b>\n"
+            "Free 3 hak (max 100) · Premium sınırsız\n"
+            "📅 2025 &amp; 2026 verileri\n\n"
+            "⭐ <b>PREMIUM PAKETLER</b>\n"
+            "🌟 Hotmail Premium — <b>400⭐</b>\n"
+            "   Hotmail · Capture · Keyword · TG-ID\n"
+            "🌍 OSINT Premium — <b>200⭐</b>\n"
+            "   LeakSights 30+ sorgu\n"
+            "📂 LOG Premium — <b>600⭐</b>\n"
+            "   Sınırsız domain log\n\n"
+            "━━━━━━━━━━━━━━━━━━━━\n"
+            "👨‍💻 <i>@hackledin</i>"
         ),
     },
     "en": {
-        "welcome": "🌟 <b>Cyber Searcher v4.4</b>\nWelcome, <b>{name}</b>!\n📌 Status: {status}\n🔻 Select an option:",
+        "welcome": "<b>🕵🏻 Cyber Search</b>\nWelcome, <b>{name}</b>!\n📌 Status: {status}\n🔻 Select an option:",
         "free": "🆓 Free", "premium": "⭐ PREMIUM",
         "osint_price": "💰 OSINT Premium: 200 Stars",
         "help_content": (
-            "📖 **HELP MENU (v4.4)**\n"
-            "📌 Your Status: {status}\n"
-            "══════════════════════\n"
-            "🔹 **⭐ PREMIUM PACKAGES:**\n"
-            "   • 🌟 Premium (400 Stars) → Unlimited Hotmail + Capture + Keyword + TG-ID\n"
-            "   • 🌍 OSINT Premium (200 Stars) → LeakSights OSINT (30+ Queries)\n"
-            "🔹 **🆔 TELEGRAM ID QUERY**:\n"
-            "   • 🆓 Free: 5 queries\n"
-            "   • 💰 Balance: 25→89⭐ / 50→180⭐ / 100→250⭐\n"
-            "   • ⭐ Premium: Unlimited\n"
-            "👨‍💻 coded by: @hackledin"
+            "📖 <b>HELP — 🕵🏻 Cyber Search</b>\n"
+            "📌 Status: <b>{status}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "🛠 <b>TOOLS</b> · Combo · Hotmail · Capture\n"
+            "Video · Music · SMS · IP · DNS · EXIF · AI Image\n\n"
+            "🆔 <b>TG-ID</b> · Free 5 · Packages · Premium unlimited\n"
+            "📂 <b>LOG</b> · Free 3 · Premium 600⭐ unlimited\n\n"
+            "⭐ <b>PREMIUM</b>\n"
+            "Hotmail 400⭐ · OSINT 200⭐ · LOG 600⭐\n\n"
+            "👨‍💻 <i>@hackledin</i>"
         ),
     },
     "ar": {
-        "welcome": "🌟 <b>Cyber Searcher v4.4</b>\nمرحباً، <b>{name}</b>!\n📌 الحالة: {status}\n🔻 اختر خياراً:",
+        "welcome": "<b>🕵🏻 Cyber Search</b>\nمرحباً، <b>{name}</b>!\n📌 الحالة: {status}\n🔻 اختر خياراً:",
         "free": "🆓 مجاني", "premium": "⭐ بريميوم",
         "osint_price": "💰 OSINT بريميوم: 200 نجمة",
         "help_content": (
-            "📖 **قائمة المساعدة (v4.4)**\n"
-            "📌 حالتك: {status}\n"
-            "══════════════════════\n"
-            "🔹 **⭐ باقات البريميوم:**\n"
-            "   • 🌟 بريميوم (400 نجمة)\n"
-            "   • 🌍 OSINT بريميوم (200 نجمة)\n"
-            "🔹 **🆔 استعلام ID تيليجرام**:\n"
-            "   • 🆓 مجاني: 5 استعلامات\n"
-            "   • 💰 الرصيد: 25→89⭐ / 50→180⭐ / 100→250⭐\n"
-            "   • ⭐ بريميوم: غير محدود\n"
-            "👨‍💻 coded by: @hackledin"
+            "📖 <b>المساعدة — 🕵🏻 Cyber Search</b>\n"
+            "📌 الحالة: <b>{status}</b>\n"
+            "━━━━━━━━━━━━━━━━━━━━\n\n"
+            "⭐ <b>الباقات</b>\n"
+            "Hotmail 400⭐ · OSINT 200⭐ · LOG 600⭐\n\n"
+            "👨‍💻 <i>@hackledin</i>"
         ),
     },
 }
@@ -2236,7 +2214,7 @@ def log_process(msg, bot_instance):
 
     header = (
         f"{'=' * 50}\n"
-        f"  📂 LOG RAPORU — Cyber Searcher\n"
+        f"  📂 LOG RAPORU — 🕵🏻 Cyber Search\n"
         f"{'=' * 50}\n"
         f"  Domain   : {domain}\n"
         f"  Satır    : {line_count}\n"
@@ -2529,7 +2507,7 @@ def aiimg_process(msg, bot_instance, is_nsfw=False):
         f"🎯 Mod: {mode}\n"
         f"📊 Kalan → Free: {free_left}/{AIIMG_FREE_LIMIT} | Bakiye: {balance}\n"
         f"━━━━━━━━━━━━━━━━━━━━━\n"
-        f"🤖 Cyber Searcher | @hackledin"
+        f"🤖 🕵🏻 Cyber Search | @hackledin"
     )
     try:
         # result = yerel dosya yolu VEYA http URL
@@ -3944,6 +3922,9 @@ def register_handlers(bot_instance):
             _btn("➖ TG-ID Bakiye Al","adm_tgid_take"),
             _btn("📋 TG-ID Logları","adm_tgid_logs"),
             _btn("💰 TG-ID Satın Almalar","adm_tgid_purchases"),
+            _btn("📂 LOG Premium Ver","adm_log_give"),
+            _btn("🎨 AI Image Bakiye Ver","adm_aiimg_give"),
+            _btn("➖ AI Image Bakiye Al","adm_aiimg_take"),
         )
         bot_instance.reply_to(msg, "👑 <b>ADMIN PANELİ</b>", reply_markup=mk)
 
@@ -4652,7 +4633,8 @@ def _admin_premium_select_user(msg, bot_instance):
     mk = InlineKeyboardMarkup(row_width=1)
     mk.add(_btn("📧 Hotmail Premium Ver", f"adm_give_hotmail_{tid}_{tuname or tid}"),
            _btn("🌍 OSINT Premium Ver", f"adm_give_osint_{tid}_{tuname or tid}"),
-           _btn("📸 Capture Premium Ver", f"adm_give_capture_{tid}_{tuname or tid}"))
+           _btn("📸 Capture Premium Ver", f"adm_give_capture_{tid}_{tuname or tid}"),
+           _btn("📂 LOG Premium Ver", f"adm_give_log_{tid}_{tuname or tid}"))
     bot_instance.send_message(msg.chat.id,
         f"👤 Kullanıcı: @{tuname or tid} (ID: {tid})\nHangi premiumu vermek istiyorsun?", reply_markup=mk)
 
@@ -4682,6 +4664,25 @@ def _admin_give_premium_capture(call, tid, tuname, bot_instance):
     if set_premium(tid, tuname or str(tid)):
         try: bot_instance.edit_message_text(f"📸 @{tuname or tid} Capture Premium verildi!", call.message.chat.id, call.message.message_id); bot_instance.answer_callback_query(call.id, "✅ Verildi!")
         except: pass
+
+def _admin_give_premium_log(call, tid, tuname, bot_instance):
+    if is_premium_log(tid):
+        try:
+            bot_instance.edit_message_text(f"ℹ️ @{tuname or tid} zaten LOG Premium!", call.message.chat.id, call.message.message_id)
+            bot_instance.answer_callback_query(call.id)
+        except:
+            pass
+        return
+    if set_premium_log(tid, tuname or str(tid)):
+        try:
+            bot_instance.edit_message_text(f"📂 @{tuname or tid} LOG Premium verildi!", call.message.chat.id, call.message.message_id)
+            bot_instance.answer_callback_query(call.id, "✅ Verildi!")
+        except:
+            pass
+        try:
+            bot_instance.send_message(tid, "🎁 <b>Admin sana LOG Premium verdi!</b>\n📂 Sınırsız domain log çekme aktif.")
+        except:
+            pass
 
 def _process_add_keyword(msg, bot_instance, uid):
     text = msg.text.strip()
@@ -4859,7 +4860,7 @@ def _process_combo(msg, bot_instance):
     now = datetime.now()
     fname = f"{domain}_{now.strftime('%Y%m%d_%H%M%S')}.txt"
     with open(fname, "w", encoding="utf-8") as f:
-        f.write(f"{'=' * 60}\nCYBER SEARCHER — {domain.upper()}\n{'=' * 60}\n")
+        f.write(f"{'=' * 60}\n🕵🏻 Cyber Search — {domain.upper()}\n{'=' * 60}\n")
         f.write(f" Toplam: {len(combos)}\nTarih: {now.strftime('%d.%m.%Y %H:%M')}\n{'=' * 60}\n")
         f.write("\n".join(combos))
         f.write(f"\n{'=' * 60}\n@hackledin\n")
@@ -4981,7 +4982,7 @@ def _fmt_generic(title, data, queried, header_extra=""):
         else:
             if str(obj).strip(): lines.append(f"{prefix}{obj}")
     _dump(data)
-    lines += ["", "=" * 60, f" {header_extra} — Cyber Searcher", " Developer: @hackledin", "=" * 60]
+    lines += ["", "=" * 60, f" {header_extra} — 🕵🏻 Cyber Search", " Developer: @hackledin", "=" * 60]
     return "\n".join(lines)
 
 def _send_txt_result(chat_id, status_mid, bot_instance, fname, content, caption):
@@ -5101,17 +5102,22 @@ def _handle_admin_cb(call, action, bot_instance):
             return
         elif action == "prem_users":
             conn = sqlite3.connect(DB_PATH); c = conn.cursor()
-            c.execute("SELECT user_id,username,first_name,premium_date,premium_osint_date FROM users WHERE is_premium=1 OR is_premium_osint=1")
+            c.execute("SELECT user_id,username,first_name,premium_date,premium_osint_date,premium_log_date FROM users WHERE is_premium=1 OR is_premium_osint=1 OR is_premium_log=1")
             users = c.fetchall(); conn.close()
             if not users:
                 try: bot_instance.answer_callback_query(call.id, "Henüz premium kullanıcı yok.")
                 except: pass
                 return
             txt = "⭐ <b>PREMIUM KULLANICILARI</b>\n"
-            for u_id, uname, fname, prem_date, osint_date in users:
+            for row in users:
+                u_id, uname, fname = row[0], row[1], row[2]
+                prem_date = row[3] if len(row) > 3 else None
+                osint_date = row[4] if len(row) > 4 else None
+                log_date = row[5] if len(row) > 5 else None
                 txt += f"👤 @{uname or fname or u_id}\n"
                 if prem_date: txt += f"   📧 Hotmail: {prem_date}\n"
                 if osint_date: txt += f"   🌍 OSINT: {osint_date}\n"
+                if log_date: txt += f"   📂 LOG: {log_date}\n"
                 txt += "\n"
             try: bot_instance.edit_message_text(txt[:4096], cid, mid)
             except: bot_instance.send_message(cid, txt[:4096])
@@ -5147,6 +5153,27 @@ def _handle_admin_cb(call, action, bot_instance):
         elif action.startswith("give_capture_"):
             parts = action.split("_"); tid = int(parts[2]); tuname = parts[3] if len(parts) > 3 else str(tid)
             _admin_give_premium_capture(call, tid, tuname, bot_instance); return
+        elif action.startswith("give_log_"):
+            parts = action.split("_"); tid = int(parts[2]); tuname = parts[3] if len(parts) > 3 else str(tid)
+            _admin_give_premium_log(call, tid, tuname, bot_instance); return
+        elif action == "log_give":
+            m = bot_instance.send_message(cid, "📂 <b>LOG Premium Ver</b>\nKullanıcı ID veya @kullanıcıadı gir:\nÖrnek: <code>123456789</code> veya <code>@user</code>")
+            bot_instance.register_next_step_handler(m, lambda m: _admin_log_give_user(m, bot_instance))
+            try: bot_instance.answer_callback_query(call.id)
+            except: pass
+            return
+        elif action == "aiimg_give":
+            m = bot_instance.send_message(cid, "🎨 <b>AI Image Bakiye Ver</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 20</code>")
+            bot_instance.register_next_step_handler(m, lambda m: _admin_aiimg_give(m, bot_instance))
+            try: bot_instance.answer_callback_query(call.id)
+            except: pass
+            return
+        elif action == "aiimg_take":
+            m = bot_instance.send_message(cid, "➖ <b>AI Image Bakiye Al</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 5</code>")
+            bot_instance.register_next_step_handler(m, lambda m: _admin_aiimg_take(m, bot_instance))
+            try: bot_instance.answer_callback_query(call.id)
+            except: pass
+            return
         elif action == "remove":
             m = bot_instance.send_message(cid, "👤 **Premium Kaldır**\nKullanıcı ID veya @kullanıcıadı gir:")
             bot_instance.register_next_step_handler(m, lambda m: _admin_remove(m, bot_instance))
@@ -5265,8 +5292,78 @@ def _admin_remove(msg, bot_instance):
     removed = []
     if is_premium(tid): remove_premium(tid); removed.append("Hotmail")
     if is_premium_osint(tid): remove_premium_osint(tid); removed.append("OSINT")
+    if is_premium_log(tid): remove_premium_log(tid); removed.append("LOG")
     if removed: bot_instance.reply_to(msg, f"✅ @{tuname or tid} {', '.join(removed)} Premium kaldırıldı!")
     else: bot_instance.reply_to(msg, f"ℹ️ @{tuname or tid} zaten Premium değil!")
+
+def _admin_log_give_user(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID: return
+    tid, tuname = _resolve_target(msg.text.strip())
+    if not tid:
+        bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı! @kullanici veya ID gir."); return
+    add_user(tid, tuname or "", "")
+    if is_premium_log(tid):
+        bot_instance.reply_to(msg, f"ℹ️ @{tuname or tid} zaten LOG Premium!"); return
+    if set_premium_log(tid, tuname or str(tid)):
+        bot_instance.reply_to(msg, f"✅ <b>LOG Premium verildi!</b>\n👤 @{tuname or tid}\n🆔 <code>{tid}</code>")
+        try:
+            bot_instance.send_message(tid, "🎁 <b>Admin sana LOG Premium verdi!</b>\n📂 Sınırsız domain log çekme aktif.\n📅 Veriler: 2025 & 2026")
+        except:
+            pass
+    else:
+        bot_instance.reply_to(msg, "❌ LOG Premium verilemedi.")
+
+def _admin_aiimg_give(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID: return
+    try:
+        parts = msg.text.strip().split()
+        target = int(parts[0])
+        amount = int(parts[1])
+        if amount <= 0:
+            raise ValueError
+    except:
+        bot_instance.reply_to(msg, "❌ Geçersiz format! Örnek: <code>123456789 20</code>"); return
+    add_user(target, "", "")
+    aiimg_init_user(target)
+    aiimg_add_balance(target, amount)
+    new_bal = aiimg_get_balance(target)
+    bot_instance.reply_to(
+        msg,
+        f"✅ <b>AI Image Bakiye Verildi!</b>\n"
+        f"🆔 Kullanıcı: <code>{target}</code>\n"
+        f"➕ Miktar: <b>+{amount}</b> hak\n"
+        f"💰 Yeni bakiye: <b>{new_bal}</b>"
+    )
+    try:
+        bot_instance.send_message(
+            target,
+            f"🎁 <b>Admin sana AI Image hakkı verdi!</b>\n"
+            f"➕ Eklenen: <b>+{amount}</b> üretim hakkı\n"
+            f"💰 Yeni bakiyen: <b>{new_bal}</b>"
+        )
+    except:
+        pass
+
+def _admin_aiimg_take(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID: return
+    try:
+        parts = msg.text.strip().split()
+        target = int(parts[0])
+        amount = int(parts[1])
+        if amount <= 0:
+            raise ValueError
+    except:
+        bot_instance.reply_to(msg, "❌ Geçersiz format! Örnek: <code>123456789 5</code>"); return
+    current = aiimg_get_balance(target)
+    new_bal = max(0, current - amount)
+    aiimg_set(target, "balance", new_bal)
+    bot_instance.reply_to(
+        msg,
+        f"✅ <b>AI Image Bakiye Alındı!</b>\n"
+        f"🆔 Kullanıcı: <code>{target}</code>\n"
+        f"➖ Miktar: <b>-{amount}</b>\n"
+        f"💰 Yeni bakiye: <b>{new_bal}</b>"
+    )
 
 def _admin_ban(msg, bot_instance):
     tid, tuname = _resolve_target(msg.text.strip())
@@ -5349,7 +5446,7 @@ if __name__ == "__main__":
     start_saved_bots()
     print("""
 ╔══════════════════════════════════════════════════════╗
-║       CYBER SEARCHER v4.4 — PRODUCTION               ║
+║       🕵🏻 Cyber Search — PRODUCTION                   ║
 ║         Developer: @hackledin                        ║
 ╠══════════════════════════════════════════════════════╣
 ║  ✅ YouTube POT Provider                             ║
