@@ -74,6 +74,24 @@ TGID_PRICE_50          = 180
 TGID_PRICE_100         = 250
 
 # ══════════════════════════════════════════════════════════════
+#  🎨 AI IMAGE GENERATOR (text2image)
+# ══════════════════════════════════════════════════════════════
+AIIMG_API_URL          = "https://data.miaitool.com/api/text2image"
+AIIMG_SOURCE_URL       = "https://www.aidoimg.com/ai-image-tools/ai-image-generator/index"
+AIIMG_FREE_LIMIT       = 2
+AIIMG_PACKAGE_10       = 10
+AIIMG_PACKAGE_20       = 20
+AIIMG_PACKAGE_30       = 30
+AIIMG_PACKAGE_50       = 50
+AIIMG_PACKAGE_100      = 100
+AIIMG_PRICE_10         = 84
+AIIMG_PRICE_20         = 100
+AIIMG_PRICE_30         = 150
+AIIMG_PRICE_50         = 350
+AIIMG_PRICE_100        = 600
+AIIMG_SIZE             = "576x1024"
+
+# ══════════════════════════════════════════════════════════════
 #  YT-DLP POT PROVIDER AYARI
 # ══════════════════════════════════════════════════════════════
 POT_PROVIDER_URL = "http://127.0.0.1:4416"
@@ -165,6 +183,31 @@ def db_init():
         username TEXT,
         package TEXT,
         queries INTEGER,
+        stars INTEGER,
+        date TEXT
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS aiimg_users (
+        user_id INTEGER PRIMARY KEY,
+        free_used INTEGER DEFAULT 0,
+        balance INTEGER DEFAULT 0,
+        total_gens INTEGER DEFAULT 0
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS aiimg_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT,
+        prompt TEXT,
+        is_nsfw INTEGER DEFAULT 0,
+        status TEXT,
+        detail TEXT,
+        date TEXT
+    )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS aiimg_purchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        username TEXT,
+        package TEXT,
+        credits INTEGER,
         stars INTEGER,
         date TEXT
     )''')
@@ -557,6 +600,104 @@ def tgid_log_purchase(user_id, username, package, queries, stars):
         c = conn.cursor()
         c.execute("INSERT INTO tgid_purchases (user_id,username,package,queries,stars,date) VALUES (?,?,?,?,?,?)",
                   (user_id, username, package, queries, stars, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+# ══════════════════════════════════════════════════════════════
+#  🎨 AI IMAGE GENERATOR — VERİTABANI FONKSİYONLARI
+# ══════════════════════════════════════════════════════════════
+def aiimg_init_user(user_id):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO aiimg_users (user_id) VALUES (?)", (user_id,))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+def aiimg_get(user_id, col):
+    try:
+        aiimg_init_user(user_id)
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(f"SELECT {col} FROM aiimg_users WHERE user_id=?", (user_id,))
+        r = c.fetchone()
+        conn.close()
+        return r[0] if r else 0
+    except:
+        return 0
+
+def aiimg_set(user_id, col, val):
+    try:
+        aiimg_init_user(user_id)
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute(f"UPDATE aiimg_users SET {col}=? WHERE user_id=?", (val, user_id))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+def aiimg_get_free_used(user_id):
+    return aiimg_get(user_id, "free_used") or 0
+
+def aiimg_get_balance(user_id):
+    return aiimg_get(user_id, "balance") or 0
+
+def aiimg_get_total(user_id):
+    return aiimg_get(user_id, "total_gens") or 0
+
+def aiimg_can_gen(user_id):
+    if user_id == ADMIN_ID:
+        return True, "admin"
+    free_used = aiimg_get_free_used(user_id)
+    if free_used < AIIMG_FREE_LIMIT:
+        return True, "free"
+    if aiimg_get_balance(user_id) > 0:
+        return True, "balance"
+    return False, None
+
+def aiimg_use_credit(user_id):
+    if user_id == ADMIN_ID:
+        aiimg_set(user_id, "total_gens", aiimg_get_total(user_id) + 1)
+        return True, "admin"
+    free_used = aiimg_get_free_used(user_id)
+    if free_used < AIIMG_FREE_LIMIT:
+        aiimg_set(user_id, "free_used", free_used + 1)
+        aiimg_set(user_id, "total_gens", aiimg_get_total(user_id) + 1)
+        return True, "free"
+    balance = aiimg_get_balance(user_id)
+    if balance > 0:
+        aiimg_set(user_id, "balance", balance - 1)
+        aiimg_set(user_id, "total_gens", aiimg_get_total(user_id) + 1)
+        return True, "balance"
+    return False, None
+
+def aiimg_add_balance(user_id, amount):
+    current = aiimg_get_balance(user_id)
+    aiimg_set(user_id, "balance", current + amount)
+
+def aiimg_log(user_id, username, prompt, is_nsfw, status, detail=""):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT INTO aiimg_logs (user_id,username,prompt,is_nsfw,status,detail,date) VALUES (?,?,?,?,?,?,?)",
+                  (user_id, username, prompt[:500], 1 if is_nsfw else 0, status, str(detail)[:200],
+                   datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit()
+        conn.close()
+    except:
+        pass
+
+def aiimg_log_purchase(user_id, username, package, credits, stars):
+    try:
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        c.execute("INSERT INTO aiimg_purchases (user_id,username,package,credits,stars,date) VALUES (?,?,?,?,?,?)",
+                  (user_id, username, package, credits, stars, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
         conn.commit()
         conn.close()
     except:
@@ -1563,6 +1704,7 @@ S = {
             "   • 📧 Hotmail Checker - Free 3000 satır\n"
             "   • 📸 Capture Tool - Free 3 kullanım\n"
             "   • 📸 EXIF Metadata Analizi ✅\n"
+            "   • 🎨 AI Image Generator ✅ (Free 2 hak | +18 ayrı)\n"
             "👨‍💻 coded by: @hackledin"
         ),
     },
@@ -1823,6 +1965,7 @@ def tools_kb(user_id):
         _btn("💣 SMS Bomber", "tool_smsbomb"), _btn("📧 Hotmail Checker", "tool_hotmail"),
         _btn("📸 EXIF Metadata", "tool_exif"),
         _btn("🆔 Telegram ID Sorgu", "tool_tgid"),
+        _btn("🎨 AI Image Generator", "tool_aiimg"),
     )
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
     return mk
@@ -1899,6 +2042,116 @@ def tgid_packages_kb():
     mk.add(_btn(f"💎 {TGID_PACKAGE_100} Sorgu — {TGID_PRICE_100} ⭐", "tgid_buy_100"))
     mk.add(_btn("◀️ Geri", "tool_tgid"))
     return mk
+
+def aiimg_kb(user_id):
+    mk = InlineKeyboardMarkup(row_width=1)
+    free_left = max(0, AIIMG_FREE_LIMIT - aiimg_get_free_used(user_id))
+    balance = aiimg_get_balance(user_id)
+    if user_id == ADMIN_ID:
+        durum = "👑 Admin — Sınırsız"
+    else:
+        durum = f"🆓 Free: {free_left}/{AIIMG_FREE_LIMIT}  |  💰 Bakiye: {balance}"
+    mk.add(_btn(f"📊 {durum}", "noop"))
+    mk.add(_btn("🎨 Normal Generate", "aiimg_normal"))
+    mk.add(_btn("🔥 +18 NSFW Generate", "aiimg_nsfw"))
+    mk.add(_btn("💎 Hak Satın Al", "aiimg_packages"))
+    mk.add(_btn("📊 İstatistiklerim", "aiimg_stats"))
+    mk.add(_btn("◀️ Geri", "goto_tools"))
+    return mk
+
+def aiimg_packages_kb():
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(_btn(f"💎 10 Hak — {AIIMG_PRICE_10} ⭐", "aiimg_buy_10"))
+    mk.add(_btn(f"💎 20 Hak — {AIIMG_PRICE_20} ⭐", "aiimg_buy_20"))
+    mk.add(_btn(f"💎 30 Hak — {AIIMG_PRICE_30} ⭐", "aiimg_buy_30"))
+    mk.add(_btn(f"💎 50 Hak — {AIIMG_PRICE_50} ⭐", "aiimg_buy_50"))
+    mk.add(_btn(f"💎 100 Hak — {AIIMG_PRICE_100} ⭐", "aiimg_buy_100"))
+    mk.add(_btn("◀️ Geri", "tool_aiimg"))
+    return mk
+
+def aiimg_generate(prompt, is_nsfw=False):
+    """API ile resim üretir, başarılı olursa image_url döner."""
+    try:
+        payload = {
+            "prompt": prompt,
+            "size": AIIMG_SIZE,
+            "function": "ai-image-generator-text2image",
+            "source_url": AIIMG_SOURCE_URL
+        }
+        if is_nsfw:
+            payload["prompt"] = f"NSFW, explicit, adult content, {prompt}"
+        r = requests.post(AIIMG_API_URL, data=payload, timeout=30)
+        data = r.json()
+        task_id = data.get("task_id")
+        if not task_id:
+            return False, "❌ Task ID alınamadı. API yanıtı: " + str(data)[:200]
+        status_payload = {
+            "task_id": task_id,
+            "source_url": "https://google.com"
+        }
+        max_tries = 40
+        for i in range(max_tries):
+            time.sleep(2.5)
+            status_res = requests.post(AIIMG_API_URL, data=status_payload, timeout=20)
+            result = status_res.json()
+            task_status = result.get("task_status") or result.get("status")
+            if task_status == "SUCCEEDED":
+                image_url = result.get("url")
+                if image_url:
+                    return True, image_url
+                return False, "❌ Resim URL bulunamadı."
+            elif task_status == "FAILED":
+                return False, f"❌ Üretim başarısız: {result}"
+        return False, "⏰ Zaman aşımı. Lütfen tekrar dene."
+    except Exception as e:
+        return False, f"❌ Hata: {e}"
+
+def aiimg_process(msg, bot_instance, is_nsfw=False):
+    uid = msg.from_user.id
+    username = msg.from_user.username or ""
+    prompt = (msg.text or "").strip()
+    if not prompt or len(prompt) < 3:
+        bot_instance.reply_to(msg, "❌ Prompt en az 3 karakter olmalı!\nÖrnek: <code>beautiful woman in red dress, cinematic lighting</code>", parse_mode="HTML")
+        return
+    allowed, source = aiimg_can_gen(uid)
+    if not allowed:
+        free_left = max(0, AIIMG_FREE_LIMIT - aiimg_get_free_used(uid))
+        bot_instance.reply_to(msg,
+            f"❌ <b>Hakkınız kalmadı!</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆓 Free kalan: <b>{free_left}</b>/{AIIMG_FREE_LIMIT}\n"
+            f"💰 Bakiye: <b>{aiimg_get_balance(uid)}</b>\n\n"
+            f"💎 <b>Hak satın almak için butona bas:</b>",
+            reply_markup=aiimg_packages_kb(), parse_mode="HTML")
+        return
+    wait = bot_instance.reply_to(msg, f"🎨 <b>Resim üretiliyor...</b>\n📝 Prompt: <code>{prompt[:80]}</code>\n⏳ 30-90 saniye sürebilir...", parse_mode="HTML")
+    success, result = aiimg_generate(prompt, is_nsfw=is_nsfw)
+    if not success:
+        try:
+            bot_instance.edit_message_text(result, msg.chat.id, wait.message_id, parse_mode="HTML")
+        except:
+            bot_instance.send_message(msg.chat.id, result, parse_mode="HTML")
+        aiimg_log(uid, username, prompt, is_nsfw, "FAIL", str(result)[:100])
+        return
+    aiimg_use_credit(uid)
+    free_left = max(0, AIIMG_FREE_LIMIT - aiimg_get_free_used(uid))
+    balance = aiimg_get_balance(uid)
+    mode = "🔥 +18 NSFW" if is_nsfw else "🎨 Normal"
+    caption = (
+        f"✅ <b>AI Image Hazır!</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📝 <b>Prompt:</b> <code>{prompt[:120]}</code>\n"
+        f"🎯 Mod: {mode}\n"
+        f"📊 Kalan → Free: {free_left}/{AIIMG_FREE_LIMIT} | Bakiye: {balance}\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🤖 Cyber Searcher | @hackledin"
+    )
+    try:
+        bot_instance.send_photo(msg.chat.id, result, caption=caption, parse_mode="HTML")
+        bot_instance.delete_message(msg.chat.id, wait.message_id)
+    except Exception as e:
+        bot_instance.send_message(msg.chat.id, f"✅ Resim: {result}\n\n{caption}\n\n⚠️ Fotoğraf gönderilemedi: {e}", parse_mode="HTML")
+    aiimg_log(uid, username, prompt, is_nsfw, "OK", result[:100])
 
 # ══════════════════════════════════════════════════════════════
 #  MULTI-BOT MANAGEMENT
@@ -3499,6 +3752,118 @@ def register_handlers(bot_instance):
                 except Exception as e:
                     bot_instance.answer_callback_query(call.id, f"❌ Hata: {e}", show_alert=True)
                 return
+            # ── 🎨 AI IMAGE GENERATOR ──
+            if data == "tool_aiimg":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                free_left = max(0, AIIMG_FREE_LIMIT - aiimg_get_free_used(uid))
+                balance = aiimg_get_balance(uid)
+                if uid == ADMIN_ID:
+                    durum = "👑 Admin — Sınırsız"
+                else:
+                    durum = f"🆓 Free: {free_left}/{AIIMG_FREE_LIMIT}  |  💰 Bakiye: {balance}"
+                txt = (
+                    f"🎨 <b>AI IMAGE GENERATOR</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📊 {durum}\n\n"
+                    f"🇬🇧 <b>Prompt'u İngilizce yaz!</b>\n\n"
+                    f"<b>Örnek Promptlar:</b>\n"
+                    f"• <code>beautiful woman in red dress, cinematic lighting, 8k</code>\n"
+                    f"• <code>cyberpunk city at night, neon lights, rain</code>\n"
+                    f"• <code>fantasy warrior with sword, epic, detailed armor</code>\n\n"
+                    f"🔥 +18 için ayrı butona bas.\n"
+                    f"💎 Hak bitince yıldız ile paket al."
+                )
+                try:
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
+                                                   reply_markup=aiimg_kb(uid), parse_mode="HTML")
+                except:
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=aiimg_kb(uid), parse_mode="HTML")
+                return
+            if data == "aiimg_normal":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                m = bot_instance.send_message(call.message.chat.id,
+                    "🎨 <b>Normal AI Image</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    "İngilizce prompt yaz:\n\n"
+                    "📌 <b>Örnek:</b>\n<code>beautiful landscape, mountains, sunset, 8k detailed</code>",
+                    parse_mode="HTML")
+                bot_instance.register_next_step_handler(m, lambda m: aiimg_process(m, bot_instance, is_nsfw=False))
+                return
+            if data == "aiimg_nsfw":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                m = bot_instance.send_message(call.message.chat.id,
+                    "🔥 <b>+18 NSFW AI Image</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    "⚠️ Sadece yetişkin içerik!\nİngilizce prompt yaz:\n\n"
+                    "📌 <b>Örnek:</b>\n<code>sexy woman, lingerie, bedroom, detailed</code>",
+                    parse_mode="HTML")
+                bot_instance.register_next_step_handler(m, lambda m: aiimg_process(m, bot_instance, is_nsfw=True))
+                return
+            if data == "aiimg_packages":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                txt = (
+                    f"💎 <b>AI IMAGE HAK PAKETLERİ</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"Telegram Stars ile öde, anında hak gelsin.\n\n"
+                    f"• <b>10 Hak</b> → {AIIMG_PRICE_10} ⭐\n"
+                    f"• <b>20 Hak</b> → {AIIMG_PRICE_20} ⭐\n"
+                    f"• <b>30 Hak</b> → {AIIMG_PRICE_30} ⭐\n"
+                    f"• <b>50 Hak</b> → {AIIMG_PRICE_50} ⭐\n"
+                    f"• <b>100 Hak</b> → {AIIMG_PRICE_100} ⭐"
+                )
+                try:
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
+                                                   reply_markup=aiimg_packages_kb(), parse_mode="HTML")
+                except:
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=aiimg_packages_kb(), parse_mode="HTML")
+                return
+            if data == "aiimg_stats":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                free_used = aiimg_get_free_used(uid)
+                free_left = max(0, AIIMG_FREE_LIMIT - free_used)
+                balance = aiimg_get_balance(uid)
+                total = aiimg_get_total(uid)
+                txt = (
+                    f"📊 <b>AI IMAGE İSTATİSTİKLERİN</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🎨 Toplam üretim: <b>{total}</b>\n"
+                    f"🆓 Free kullanılan: <b>{free_used}</b>/{AIIMG_FREE_LIMIT}\n"
+                    f"🆓 Free kalan: <b>{free_left}</b>\n"
+                    f"💰 Bakiye: <b>{balance}</b>\n"
+                )
+                if uid == ADMIN_ID:
+                    txt += "\n👑 <b>Admin — Sınırsız</b>"
+                bot_instance.send_message(call.message.chat.id, txt, parse_mode="HTML")
+                return
+            if data.startswith("aiimg_buy_"):
+                pkg_num = data.replace("aiimg_buy_", "")
+                pkg_map = {
+                    "10": (AIIMG_PACKAGE_10, AIIMG_PRICE_10, "10 Hak"),
+                    "20": (AIIMG_PACKAGE_20, AIIMG_PRICE_20, "20 Hak"),
+                    "30": (AIIMG_PACKAGE_30, AIIMG_PRICE_30, "30 Hak"),
+                    "50": (AIIMG_PACKAGE_50, AIIMG_PRICE_50, "50 Hak"),
+                    "100": (AIIMG_PACKAGE_100, AIIMG_PRICE_100, "100 Hak"),
+                }
+                if pkg_num not in pkg_map:
+                    try: bot_instance.answer_callback_query(call.id, "❌ Geçersiz paket!", show_alert=True)
+                    except: pass
+                    return
+                qty, stars, label = pkg_map[pkg_num]
+                prices = [LabeledPrice(label=label, amount=stars)]
+                try:
+                    bot_instance.send_invoice(
+                        chat_id=call.message.chat.id,
+                        title=f"🎨 {label}",
+                        description=f"{qty} adet AI Image üretim hakkı",
+                        invoice_payload=f"aiimg_{pkg_num}",
+                        provider_token="",
+                        currency="XTR",
+                        prices=prices
+                    )
+                    bot_instance.answer_callback_query(call.id, "✅ Fatura gönderildi!")
+                except Exception as e:
+                    bot_instance.answer_callback_query(call.id, f"❌ Hata: {e}", show_alert=True)
+                return
             if data == "tool_exif":
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
@@ -3748,6 +4113,29 @@ def register_handlers(bot_instance):
                 try:
                     bot_instance.send_message(ADMIN_ID,
                         f"💰 <b>YENİ TG-ID SATIN ALMA!</b>\n👤 @{username}\n📦 {label} — {stars} ⭐")
+                except: pass
+            return
+        if payload.startswith("aiimg_"):
+            pkg_num = payload.replace("aiimg_", "")
+            pkg_map = {
+                "10": (AIIMG_PACKAGE_10, AIIMG_PRICE_10, "10 Hak"),
+                "20": (AIIMG_PACKAGE_20, AIIMG_PRICE_20, "20 Hak"),
+                "30": (AIIMG_PACKAGE_30, AIIMG_PRICE_30, "30 Hak"),
+                "50": (AIIMG_PACKAGE_50, AIIMG_PRICE_50, "50 Hak"),
+                "100": (AIIMG_PACKAGE_100, AIIMG_PRICE_100, "100 Hak"),
+            }
+            if pkg_num in pkg_map:
+                qty, stars, label = pkg_map[pkg_num]
+                aiimg_add_balance(uid, qty)
+                aiimg_log_purchase(uid, username, label, qty, stars)
+                bot_instance.reply_to(msg,
+                    f"🎉 <b>Ödeme Başarılı!</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"🎨 Paket: <b>{label}</b>\n➕ Eklenen: <b>+{qty}</b> AI Image hakkı\n"
+                    f"💰 Yeni Bakiye: <b>{aiimg_get_balance(uid)}</b>\n\n"
+                    f"Hemen resim üretmeye başlayabilirsin! 🎨", parse_mode="HTML")
+                try:
+                    bot_instance.send_message(ADMIN_ID,
+                        f"💰 <b>YENİ AI IMAGE SATIN ALMA!</b>\n👤 @{username}\n📦 {label} — {stars} ⭐")
                 except: pass
             return
         if payload == "premium":
