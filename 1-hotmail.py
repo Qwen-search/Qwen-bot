@@ -250,53 +250,91 @@ def db_get(user_id, col):
         r = c.fetchone()
         conn.close()
         return r[0] if r else None
-    except:
+    except Exception as e:
+        print(f"[DB GET ERROR] {col}: {e}")
         return None
 
 def db_set(user_id, col, val):
+    """Kullanıcı yoksa önce oluşturur, sonra günceller."""
     try:
+        add_user(user_id)
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute(f"UPDATE users SET {col}=? WHERE user_id=?", (val, user_id))
         conn.commit()
+        ok = c.rowcount > 0
         conn.close()
-    except:
-        pass
+        return ok
+    except Exception as e:
+        print(f"[DB SET ERROR] {col}: {e}")
+        return False
 
 def add_user(user_id, username="", first_name=""):
     try:
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        c.execute("INSERT OR IGNORE INTO users (user_id,username,first_name,join_date) VALUES (?,?,?,?)",
-                  (user_id, username, first_name, datetime.now().strftime("%Y-%m-%d %H:%M")))
+        c.execute(
+            "INSERT OR IGNORE INTO users (user_id,username,first_name,join_date) VALUES (?,?,?,?)",
+            (user_id, username or "", first_name or "", datetime.now().strftime("%Y-%m-%d %H:%M"))
+        )
+        # Username güncelle (varsa)
+        if username:
+            c.execute("UPDATE users SET username=? WHERE user_id=? AND (username IS NULL OR username='')", (username, user_id))
+        if first_name:
+            c.execute("UPDATE users SET first_name=? WHERE user_id=? AND (first_name IS NULL OR first_name='')", (first_name, user_id))
         conn.commit()
         conn.close()
-    except:
-        pass
+        return True
+    except Exception as e:
+        print(f"[ADD USER ERROR] {e}")
+        return False
+
+def _as_int_flag(val):
+    """SQLite 1/'1'/True → True."""
+    if val is None:
+        return False
+    try:
+        return int(val) == 1
+    except Exception:
+        return str(val).strip() in ("1", "true", "True")
 
 def is_premium(user_id):
     try:
-        return db_get(user_id, "is_premium") == 1
+        return _as_int_flag(db_get(user_id, "is_premium"))
     except:
         return False
 
 def is_premium_osint(user_id):
     try:
-        return db_get(user_id, "is_premium_osint") == 1
+        return _as_int_flag(db_get(user_id, "is_premium_osint"))
     except:
         return False
 
 def is_premium_log(user_id):
     try:
-        return db_get(user_id, "is_premium_log") == 1
+        return _as_int_flag(db_get(user_id, "is_premium_log"))
     except:
         return False
 
 def is_banned(user_id):
     try:
-        return db_get(user_id, "is_banned") == 1
+        return _as_int_flag(db_get(user_id, "is_banned"))
     except:
         return False
+
+def ban_block_message(user_id):
+    return (
+        f"🚫 <b>YASAKLANDINIZ!</b>\n"
+        f"❌ Bu botu kullanmanız yasaklanmıştır.\n"
+        f"📌 Sebep: <b>{get_ban_reason(user_id)}</b>\n"
+        f"📞 İtiraz: @hackledin"
+    )
+
+def enforce_ban(user_id):
+    """Banned ise True döner (işlem durmalı). Admin muaf."""
+    if user_id == ADMIN_ID:
+        return False
+    return is_banned(user_id)
 
 def get_ban_reason(user_id):
     try:
@@ -307,12 +345,20 @@ def get_ban_reason(user_id):
 
 def set_premium(user_id, username=""):
     try:
+        add_user(user_id, username or "", "")
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c.execute("UPDATE users SET is_premium=1, premium_date=? WHERE user_id=?", (now, user_id))
-        c.execute("INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
-                  (user_id, username, "HOTMAIL", PREMIUM_PRICE, now))
+        if c.rowcount == 0:
+            c.execute(
+                "INSERT INTO users (user_id,username,is_premium,premium_date,join_date) VALUES (?,?,1,?,?)",
+                (user_id, username or "", now, now)
+            )
+        c.execute(
+            "INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
+            (user_id, username or "", "HOTMAIL", PREMIUM_PRICE, now)
+        )
         conn.commit()
         conn.close()
         print(f"[PREMIUM] Hotmail Premium verildi: {user_id} - {username}")
@@ -323,12 +369,20 @@ def set_premium(user_id, username=""):
 
 def set_premium_osint(user_id, username=""):
     try:
+        add_user(user_id, username or "", "")
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c.execute("UPDATE users SET is_premium_osint=1, premium_osint_date=? WHERE user_id=?", (now, user_id))
-        c.execute("INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
-                  (user_id, username, "OSINT", OSINT_PRICE, now))
+        if c.rowcount == 0:
+            c.execute(
+                "INSERT INTO users (user_id,username,is_premium_osint,premium_osint_date,join_date) VALUES (?,?,1,?,?)",
+                (user_id, username or "", now, now)
+            )
+        c.execute(
+            "INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
+            (user_id, username or "", "OSINT", OSINT_PRICE, now)
+        )
         conn.commit()
         conn.close()
         print(f"[PREMIUM] OSINT Premium verildi: {user_id} - {username}")
@@ -339,12 +393,20 @@ def set_premium_osint(user_id, username=""):
 
 def set_premium_log(user_id, username=""):
     try:
+        add_user(user_id, username or "", "")
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         c.execute("UPDATE users SET is_premium_log=1, premium_log_date=? WHERE user_id=?", (now, user_id))
-        c.execute("INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
-                  (user_id, username, "LOG", LOG_PRICE, now))
+        if c.rowcount == 0:
+            c.execute(
+                "INSERT INTO users (user_id,username,is_premium_log,premium_log_date,join_date) VALUES (?,?,1,?,?)",
+                (user_id, username or "", now, now)
+            )
+        c.execute(
+            "INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
+            (user_id, username or "", "LOG", LOG_PRICE, now)
+        )
         conn.commit()
         conn.close()
         print(f"[PREMIUM] LOG Premium verildi: {user_id} - {username}")
@@ -354,14 +416,17 @@ def set_premium_log(user_id, username=""):
         return False
 
 def remove_premium(user_id):
+    add_user(user_id)
     db_set(user_id, "is_premium", 0)
     db_set(user_id, "premium_date", "")
 
 def remove_premium_osint(user_id):
+    add_user(user_id)
     db_set(user_id, "is_premium_osint", 0)
     db_set(user_id, "premium_osint_date", "")
 
 def remove_premium_log(user_id):
+    add_user(user_id)
     db_set(user_id, "is_premium_log", 0)
     db_set(user_id, "premium_log_date", "")
 
@@ -557,12 +622,31 @@ def update_stats(user_id, combos):
         pass
 
 def ban_user(user_id, reason="Kural ihlali"):
-    db_set(user_id, "is_banned", 1)
-    db_set(user_id, "ban_reason", reason)
+    add_user(user_id)
+    ok1 = db_set(user_id, "is_banned", 1)
+    ok2 = db_set(user_id, "ban_reason", reason or "Kural ihlali")
+    # Aktif adımları temizle
+    try:
+        USER_STATES.pop(user_id, None)
+    except Exception:
+        pass
+    # SMS varsa durdur
+    try:
+        with _SMS_LOCK:
+            if user_id in _SMS_SESSIONS and _SMS_SESSIONS[user_id].get("event"):
+                _SMS_SESSIONS[user_id]["event"].set()
+                _SMS_SESSIONS[user_id]["running"] = False
+    except Exception:
+        pass
+    print(f"[BAN] user={user_id} reason={reason} ok={ok1 and ok2} verify={is_banned(user_id)}")
+    return bool(ok1) and is_banned(user_id)
 
 def unban_user(user_id):
-    db_set(user_id, "is_banned", 0)
-    db_set(user_id, "ban_reason", "")
+    add_user(user_id)
+    ok1 = db_set(user_id, "is_banned", 0)
+    ok2 = db_set(user_id, "ban_reason", "")
+    print(f"[UNBAN] user={user_id} ok={ok1 and ok2}")
+    return bool(ok1)
 
 def get_banned_users():
     try:
@@ -4078,8 +4162,8 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["start"])
     def cmd_start(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\n❌ Bu botu kullanmanız yasaklanmıştır.\n📌 Sebep: {get_ban_reason(uid)}\n📞 İtiraz için: @hackledin")
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
             return
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
         mk = InlineKeyboardMarkup(row_width=3)
@@ -4089,8 +4173,8 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["premium"])
     def cmd_premium(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         if is_premium(uid):
             bot_instance.reply_to(msg, s(uid, "already_premium")); return
         txt = (f"{s(uid,'premium_title')}\n━━━━━━━━━━━━━━━━━━━━━\n"
@@ -4101,8 +4185,8 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["hotmail"])
     def cmd_hotmail(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         user_name = get_user_name(uid); keywords = get_user_keywords(uid)
         limit_text = get_keyword_limit_text(uid); is_prem = is_premium(uid)
         capture_left = get_capture_limit_text(uid)
@@ -4126,8 +4210,8 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["istatistik"])
     def cmd_stats_detailed(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         tu, prem_pu, osint_pu, tc, tch = get_bot_stats()
         bot_instance.reply_to(msg,
             f"📊 **SİSTEM İSTATİSTİKLERİ**\n━━━━━━━━━━━━━━━━━━━━━\n"
@@ -4139,8 +4223,8 @@ def register_handlers(bot_instance):
     def cmd_tgid(msg):
         uid = msg.from_user.id
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         free_left = max(0, TGID_FREE_LIMIT - tgid_get_free_used(uid))
         balance = tgid_get_balance(uid)
         if uid == ADMIN_ID: durum = "👑 Admin — Sınırsız"
@@ -4156,8 +4240,8 @@ def register_handlers(bot_instance):
     def cmd_exif(msg):
         uid = msg.from_user.id
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         bot_instance.reply_to(msg,
             "📸 <b>EXIF Metadata Okuyucu</b>\n" + "━" * 28 + "\n"
             "Analiz etmek istediğin fotoğrafı gönder.\n"
@@ -4176,8 +4260,8 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["addbot"])
     def cmd_addbot(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         parts = msg.text.split(maxsplit=1)
         if len(parts) < 2:
             USER_STATES[uid] = {"action": "addbot"}
@@ -4192,16 +4276,16 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(commands=["video"])
     def cmd_video(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         m = bot_instance.reply_to(msg, s(uid, "video_ask"))
         bot_instance.register_next_step_handler(m, lambda m: _process_video(m, bot_instance))
 
     @bot_instance.message_handler(commands=["smsbomb","sms"])
     def cmd_smsbomb(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         with _SMS_LOCK:
             if uid in _SMS_SESSIONS and _SMS_SESSIONS[uid].get("running"):
                 sess = _SMS_SESSIONS[uid]
@@ -4278,9 +4362,10 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(content_types=["photo","document"])
     def handle_photo_exif(msg):
         uid = msg.from_user.id
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
+            return
         add_user(uid, msg.from_user.username or "", msg.from_user.first_name or "")
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
 
         # ── PHP → Python ──
         state = USER_STATES.get(uid, {})
@@ -4341,8 +4426,77 @@ def register_handlers(bot_instance):
     @bot_instance.message_handler(func=lambda m: True, content_types=["text"])
     def handle_text(msg):
         uid = msg.from_user.id
-        if is_banned(uid):
-            bot_instance.reply_to(msg, f"🚫 **YASAKLANDINIZ!**\nSebep: {get_ban_reason(uid)}"); return
+        # Admin state'leri ban kontrolünden önce (admin kendi panelini kullansın)
+        st = USER_STATES.get(uid)
+        if st and uid == ADMIN_ID:
+            action = st.get("action")
+            if action == "adm_give_premium":
+                USER_STATES.pop(uid, None)
+                _admin_premium_select_user(msg, bot_instance)
+                return
+            if action == "adm_log_give":
+                USER_STATES.pop(uid, None)
+                _admin_log_give_user(msg, bot_instance)
+                return
+            if action == "adm_aiimg_give":
+                USER_STATES.pop(uid, None)
+                _admin_aiimg_give(msg, bot_instance)
+                return
+            if action == "adm_aiimg_take":
+                USER_STATES.pop(uid, None)
+                _admin_aiimg_take(msg, bot_instance)
+                return
+            if action == "adm_remove":
+                USER_STATES.pop(uid, None)
+                _admin_remove(msg, bot_instance)
+                return
+            if action == "adm_ban":
+                tid, tuname = _resolve_target((msg.text or "").strip())
+                if not tid:
+                    bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı! ID gir: <code>123456789</code>", parse_mode="HTML")
+                    return
+                USER_STATES[uid] = {"action": "adm_ban_reason", "tid": tid, "tuname": tuname or str(tid)}
+                bot_instance.reply_to(
+                    msg,
+                    f"🚫 Hedef: <code>{tid}</code> @{tuname or '—'}\nBan sebebini yaz:",
+                    parse_mode="HTML"
+                )
+                return
+            if action == "adm_ban_reason":
+                tid = st.get("tid")
+                tuname = st.get("tuname") or str(tid)
+                USER_STATES.pop(uid, None)
+                reason = (msg.text or "").strip() or "Kural ihlali"
+                ban_user(tid, reason)
+                if is_banned(tid):
+                    bot_instance.reply_to(
+                        msg,
+                        f"✅ <b>Banlandı</b>\n👤 @{tuname}\n🆔 <code>{tid}</code>\n📌 Sebep: {reason}",
+                        parse_mode="HTML"
+                    )
+                    try:
+                        bot_instance.send_message(
+                            tid,
+                            f"🚫 <b>YASAKLANDINIZ!</b>\n📌 Sebep: {reason}\n📞 İtiraz: @hackledin",
+                            parse_mode="HTML"
+                        )
+                    except Exception:
+                        pass
+                else:
+                    bot_instance.reply_to(msg, "❌ Ban yazılamadı (DB hatası).")
+                return
+            if action == "adm_unban":
+                USER_STATES.pop(uid, None)
+                _admin_unban(msg, bot_instance)
+                return
+            if action == "adm_announce":
+                USER_STATES.pop(uid, None)
+                _admin_announce(msg, bot_instance)
+                return
+
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
+            return
         # State: Bot Ekle token bekleniyor
         st = USER_STATES.get(uid)
         if st and st.get("action") == "addbot":
@@ -4376,6 +4530,21 @@ def register_handlers(bot_instance):
         try:
             uid = call.from_user.id
             data = call.data
+            # ── BAN: Tüm buton/callback engeli ──
+            if enforce_ban(uid):
+                try:
+                    bot_instance.answer_callback_query(
+                        call.id,
+                        "🚫 Yasaklısınız! Botu kullanamazsınız.",
+                        show_alert=True
+                    )
+                except Exception:
+                    pass
+                try:
+                    bot_instance.send_message(call.message.chat.id, ban_block_message(uid), parse_mode="HTML")
+                except Exception:
+                    pass
+                return
             if data.startswith("lang_"):
                 l = data[5:]
                 db_set(uid, "language", l)
@@ -4942,11 +5111,19 @@ def register_handlers(bot_instance):
 
     @bot_instance.pre_checkout_query_handler(func=lambda q: True)
     def precheckout(q):
+        if enforce_ban(q.from_user.id):
+            bot_instance.answer_pre_checkout_query(
+                q.id, ok=False, error_message="Hesabınız yasaklandı. Ödeme yapılamaz."
+            )
+            return
         bot_instance.answer_pre_checkout_query(q.id, ok=True)
 
     @bot_instance.message_handler(content_types=["successful_payment"])
     def payment_ok(msg):
         uid = msg.from_user.id
+        if enforce_ban(uid):
+            bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
+            return
         username = msg.from_user.username or msg.from_user.first_name or str(uid)
         payload = msg.successful_payment.invoice_payload
         if payload.startswith("tgid_"):
@@ -5014,78 +5191,176 @@ def register_handlers(bot_instance):
 #  PROCESS FUNCTIONS
 # ══════════════════════════════════════════════════════════════
 def _resolve_target(text):
+    """@kullanici veya sayısal ID → (user_id, username). ID her zaman kabul edilir."""
+    if not text:
+        return (None, None)
     text = text.strip()
     if text.startswith("@"):
-        username = text[1:]
+        username = text[1:].strip()
+        if not username:
+            return (None, None)
         row = find_user_by_username(username)
-        return (row[0], row[1]) if row else (None, None)
-    elif text.isdigit():
-        user_id = int(text)
+        if row:
+            return (row[0], row[1] or username)
+        # DB'de yok — username ile bulunamadı
+        return (None, None)
+    # Sadece rakam
+    digits = "".join(ch for ch in text if ch.isdigit())
+    if digits and len(digits) >= 5:
+        user_id = int(digits)
+        add_user(user_id)
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
         c.execute("SELECT user_id, username FROM users WHERE user_id=?", (user_id,))
         row = c.fetchone()
         conn.close()
-        return (row[0], row[1] or str(row[0])) if row else (user_id, str(user_id))
+        if row:
+            return (row[0], row[1] or str(row[0]))
+        return (user_id, str(user_id))
     return (None, None)
 
 def _admin_premium_select_user(msg, bot_instance):
-    tid, tuname = _resolve_target(msg.text.strip())
+    if msg.from_user.id != ADMIN_ID:
+        return
+    tid, tuname = _resolve_target(msg.text.strip() if msg.text else "")
     if not tid:
-        bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı! Lütfen @kullaniciadi veya ID girin."); return
+        bot_instance.reply_to(
+            msg,
+            "❌ Kullanıcı bulunamadı!\n"
+            "• Sayısal <b>Telegram ID</b> gir (önerilen)\n"
+            "• veya botu daha önce kullanmış @kullaniciadi\n"
+            "Örnek: <code>123456789</code>",
+            parse_mode="HTML"
+        )
+        return
     add_user(tid, tuname or "", "Premium Verildi")
+    # Callback'te username underscore sorunu olmasın diye sadece ID
     mk = InlineKeyboardMarkup(row_width=1)
-    mk.add(_btn("📧 Hotmail Premium Ver", f"adm_give_hotmail_{tid}_{tuname or tid}"),
-           _btn("🌍 OSINT Premium Ver", f"adm_give_osint_{tid}_{tuname or tid}"),
-           _btn("📸 Capture Premium Ver", f"adm_give_capture_{tid}_{tuname or tid}"),
-           _btn("📂 LOG Premium Ver", f"adm_give_log_{tid}_{tuname or tid}"))
-    bot_instance.send_message(msg.chat.id,
-        f"👤 Kullanıcı: @{tuname or tid} (ID: {tid})\nHangi premiumu vermek istiyorsun?", reply_markup=mk)
+    mk.add(
+        _btn("📧 Hotmail Premium Ver", f"adm_give_hotmail_{tid}"),
+        _btn("🌍 OSINT Premium Ver", f"adm_give_osint_{tid}"),
+        _btn("📸 Capture Premium Ver", f"adm_give_capture_{tid}"),
+        _btn("📂 LOG Premium Ver", f"adm_give_log_{tid}"),
+    )
+    bot_instance.send_message(
+        msg.chat.id,
+        f"👤 Kullanıcı: <b>@{tuname or tid}</b>\n🆔 ID: <code>{tid}</code>\n\nHangi premiumu vermek istiyorsun?",
+        reply_markup=mk,
+        parse_mode="HTML"
+    )
 
 def _admin_give_premium_hotmail(call, tid, tuname, bot_instance):
+    try:
+        bot_instance.answer_callback_query(call.id)
+    except Exception:
+        pass
+    add_user(tid, tuname or "", "")
     if is_premium(tid):
-        try: bot_instance.edit_message_text(f"ℹ️ @{tuname or tid} zaten Hotmail Premium!", call.message.chat.id, call.message.message_id); bot_instance.answer_callback_query(call.id)
-        except: pass
+        try:
+            bot_instance.edit_message_text(
+                f"ℹ️ <code>{tid}</code> zaten Hotmail Premium!",
+                call.message.chat.id, call.message.message_id, parse_mode="HTML"
+            )
+        except Exception:
+            pass
         return
     if set_premium(tid, tuname or str(tid)):
-        try: bot_instance.edit_message_text(f"📧 @{tuname or tid} Hotmail Premium verildi!", call.message.chat.id, call.message.message_id); bot_instance.answer_callback_query(call.id, "✅ Verildi!")
-        except: pass
+        ok = is_premium(tid)
+        try:
+            bot_instance.edit_message_text(
+                f"{'✅' if ok else '⚠️'} Hotmail Premium {'verildi' if ok else 'yazıldı ama doğrulanamadı'}!\n"
+                f"👤 <code>{tid}</code> @{tuname or '—'}",
+                call.message.chat.id, call.message.message_id, parse_mode="HTML"
+            )
+        except Exception:
+            pass
+        try:
+            bot_instance.send_message(
+                tid,
+                "🎁 <b>Admin sana Hotmail Premium verdi!</b>\n"
+                "📧 Sınırsız Hotmail · 📸 Capture · 🔖 Keyword · 🆔 TG-ID",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            bot_instance.edit_message_text("❌ Premium verilemedi (DB hatası).", call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
 
 def _admin_give_premium_osint(call, tid, tuname, bot_instance):
+    try:
+        bot_instance.answer_callback_query(call.id)
+    except Exception:
+        pass
+    add_user(tid, tuname or "", "")
     if is_premium_osint(tid):
-        try: bot_instance.edit_message_text(f"ℹ️ @{tuname or tid} zaten OSINT Premium!", call.message.chat.id, call.message.message_id); bot_instance.answer_callback_query(call.id)
-        except: pass
+        try:
+            bot_instance.edit_message_text(
+                f"ℹ️ <code>{tid}</code> zaten OSINT Premium!",
+                call.message.chat.id, call.message.message_id, parse_mode="HTML"
+            )
+        except Exception:
+            pass
         return
     if set_premium_osint(tid, tuname or str(tid)):
-        try: bot_instance.edit_message_text(f"🌍 @{tuname or tid} OSINT Premium verildi!", call.message.chat.id, call.message.message_id); bot_instance.answer_callback_query(call.id, "✅ Verildi!")
-        except: pass
+        try:
+            bot_instance.edit_message_text(
+                f"✅ OSINT Premium verildi!\n👤 <code>{tid}</code>",
+                call.message.chat.id, call.message.message_id, parse_mode="HTML"
+            )
+        except Exception:
+            pass
+        try:
+            bot_instance.send_message(tid, "🎁 <b>Admin sana OSINT Premium verdi!</b>\n🌍 LeakSights 30+ sorgu aktif.", parse_mode="HTML")
+        except Exception:
+            pass
+    else:
+        try:
+            bot_instance.edit_message_text("❌ OSINT Premium verilemedi.", call.message.chat.id, call.message.message_id)
+        except Exception:
+            pass
 
 def _admin_give_premium_capture(call, tid, tuname, bot_instance):
-    if is_premium(tid):
-        try: bot_instance.edit_message_text(f"ℹ️ @{tuname or tid} zaten Premium!", call.message.chat.id, call.message.message_id); bot_instance.answer_callback_query(call.id)
-        except: pass
-        return
-    if set_premium(tid, tuname or str(tid)):
-        try: bot_instance.edit_message_text(f"📸 @{tuname or tid} Capture Premium verildi!", call.message.chat.id, call.message.message_id); bot_instance.answer_callback_query(call.id, "✅ Verildi!")
-        except: pass
+    # Capture Hotmail premium ile aynı flag
+    _admin_give_premium_hotmail(call, tid, tuname, bot_instance)
 
 def _admin_give_premium_log(call, tid, tuname, bot_instance):
+    try:
+        bot_instance.answer_callback_query(call.id)
+    except Exception:
+        pass
+    add_user(tid, tuname or "", "")
     if is_premium_log(tid):
         try:
-            bot_instance.edit_message_text(f"ℹ️ @{tuname or tid} zaten LOG Premium!", call.message.chat.id, call.message.message_id)
-            bot_instance.answer_callback_query(call.id)
-        except:
+            bot_instance.edit_message_text(
+                f"ℹ️ <code>{tid}</code> zaten LOG Premium!",
+                call.message.chat.id, call.message.message_id, parse_mode="HTML"
+            )
+        except Exception:
             pass
         return
     if set_premium_log(tid, tuname or str(tid)):
         try:
-            bot_instance.edit_message_text(f"📂 @{tuname or tid} LOG Premium verildi!", call.message.chat.id, call.message.message_id)
-            bot_instance.answer_callback_query(call.id, "✅ Verildi!")
-        except:
+            bot_instance.edit_message_text(
+                f"✅ LOG Premium verildi!\n👤 <code>{tid}</code>",
+                call.message.chat.id, call.message.message_id, parse_mode="HTML"
+            )
+        except Exception:
             pass
         try:
-            bot_instance.send_message(tid, "🎁 <b>Admin sana LOG Premium verdi!</b>\n📂 Sınırsız domain log çekme aktif.")
-        except:
+            bot_instance.send_message(
+                tid,
+                "🎁 <b>Admin sana LOG Premium verdi!</b>\n📂 Sınırsız domain log çekme aktif.\n📅 Veriler: 2025 & 2026",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+    else:
+        try:
+            bot_instance.edit_message_text("❌ LOG Premium verilemedi.", call.message.chat.id, call.message.message_id)
+        except Exception:
             pass
 
 def _process_add_keyword(msg, bot_instance, uid):
@@ -5630,58 +5905,99 @@ def _handle_admin_cb(call, action, bot_instance):
             except: pass
             return
         elif action == "give_premium":
-            m = bot_instance.send_message(cid, "⭐ **Premium Ver**\nKullanıcı ID veya @kullanıcıadı gir:\nÖrnek: @user veya 123456789")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_premium_select_user(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_give_premium"}
+            bot_instance.send_message(
+                cid,
+                "⭐ <b>Premium Ver</b>\n"
+                "Kullanıcı <b>Telegram ID</b> gir (önerilen):\n"
+                "Örnek: <code>123456789</code>\n"
+                "veya botu kullanmış @kullaniciadi",
+                parse_mode="HTML"
+            )
             return
         elif action.startswith("give_hotmail_"):
-            parts = action.split("_"); tid = int(parts[2]); tuname = parts[3] if len(parts) > 3 else str(tid)
-            _admin_give_premium_hotmail(call, tid, tuname, bot_instance); return
+            try:
+                tid = int(action.split("_")[-1])
+            except Exception:
+                bot_instance.answer_callback_query(call.id, "Hatalı ID", show_alert=True); return
+            _admin_give_premium_hotmail(call, tid, str(tid), bot_instance); return
         elif action.startswith("give_osint_"):
-            parts = action.split("_"); tid = int(parts[2]); tuname = parts[3] if len(parts) > 3 else str(tid)
-            _admin_give_premium_osint(call, tid, tuname, bot_instance); return
+            try:
+                tid = int(action.split("_")[-1])
+            except Exception:
+                bot_instance.answer_callback_query(call.id, "Hatalı ID", show_alert=True); return
+            _admin_give_premium_osint(call, tid, str(tid), bot_instance); return
         elif action.startswith("give_capture_"):
-            parts = action.split("_"); tid = int(parts[2]); tuname = parts[3] if len(parts) > 3 else str(tid)
-            _admin_give_premium_capture(call, tid, tuname, bot_instance); return
+            try:
+                tid = int(action.split("_")[-1])
+            except Exception:
+                bot_instance.answer_callback_query(call.id, "Hatalı ID", show_alert=True); return
+            _admin_give_premium_capture(call, tid, str(tid), bot_instance); return
         elif action.startswith("give_log_"):
-            parts = action.split("_"); tid = int(parts[2]); tuname = parts[3] if len(parts) > 3 else str(tid)
-            _admin_give_premium_log(call, tid, tuname, bot_instance); return
+            try:
+                tid = int(action.split("_")[-1])
+            except Exception:
+                bot_instance.answer_callback_query(call.id, "Hatalı ID", show_alert=True); return
+            _admin_give_premium_log(call, tid, str(tid), bot_instance); return
         elif action == "log_give":
-            m = bot_instance.send_message(cid, "📂 <b>LOG Premium Ver</b>\nKullanıcı ID veya @kullanıcıadı gir:\nÖrnek: <code>123456789</code> veya <code>@user</code>")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_log_give_user(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_log_give"}
+            bot_instance.send_message(
+                cid,
+                "📂 <b>LOG Premium Ver</b>\nTelegram ID gir:\n<code>123456789</code>",
+                parse_mode="HTML"
+            )
             return
         elif action == "aiimg_give":
-            m = bot_instance.send_message(cid, "🎨 <b>AI Image Bakiye Ver</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 20</code>")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_aiimg_give(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_aiimg_give"}
+            bot_instance.send_message(
+                cid,
+                "🎨 <b>AI Image Bakiye Ver</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 20</code>",
+                parse_mode="HTML"
+            )
             return
         elif action == "aiimg_take":
-            m = bot_instance.send_message(cid, "➖ <b>AI Image Bakiye Al</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 5</code>")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_aiimg_take(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_aiimg_take"}
+            bot_instance.send_message(
+                cid,
+                "➖ <b>AI Image Bakiye Al</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 5</code>",
+                parse_mode="HTML"
+            )
             return
         elif action == "remove":
-            m = bot_instance.send_message(cid, "👤 **Premium Kaldır**\nKullanıcı ID veya @kullanıcıadı gir:")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_remove(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_remove"}
+            bot_instance.send_message(cid, "👤 <b>Premium Kaldır</b>\nTelegram ID gir:\n<code>123456789</code>", parse_mode="HTML")
             return
         elif action == "ban":
-            m = bot_instance.send_message(cid, "🚫 Banlamak istediğin kullanıcıyı gir (@kullanici veya ID):")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_ban(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_ban"}
+            bot_instance.send_message(
+                cid,
+                "🚫 <b>Kullanıcı Banla</b>\n"
+                "Telegram ID gir:\n<code>123456789</code>\n"
+                "(veya botu kullanmış @kullanici)",
+                parse_mode="HTML"
+            )
             return
         elif action == "unban":
-            m = bot_instance.send_message(cid, "✅ Banını kaldırmak istediğin kullanıcıyı gir:")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_unban(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_unban"}
+            bot_instance.send_message(
+                cid,
+                "✅ <b>Ban Kaldır</b>\nTelegram ID gir:\n<code>123456789</code>",
+                parse_mode="HTML"
+            )
             return
         elif action == "banned":
             banned = get_banned_users()
@@ -5695,10 +6011,10 @@ def _handle_admin_cb(call, action, bot_instance):
             except: pass
             return
         elif action == "announce":
-            m = bot_instance.send_message(cid, "📢 Duyuru mesajını gir:")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_announce(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
+            USER_STATES[uid] = {"action": "adm_announce"}
+            bot_instance.send_message(cid, "📢 Duyuru mesajını yaz ve gönder:")
             return
         elif action == "listbots":
             registry = _load_registry()
@@ -5857,23 +6173,60 @@ def _admin_aiimg_take(msg, bot_instance):
     )
 
 def _admin_ban(msg, bot_instance):
-    tid, tuname = _resolve_target(msg.text.strip())
-    if not tid: bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı!"); return
-    m = bot_instance.reply_to(msg, f"🚫 @{tuname or tid} banlanıyor... Ban sebebini gir:")
-    bot_instance.register_next_step_handler(m, lambda m: _admin_ban_reason(m, bot_instance, tid, tuname))
+    if msg.from_user.id != ADMIN_ID:
+        return
+    tid, tuname = _resolve_target((msg.text or "").strip())
+    if not tid:
+        bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı! ID gir: <code>123456789</code>", parse_mode="HTML")
+        return
+    USER_STATES[msg.from_user.id] = {"action": "adm_ban_reason", "tid": tid, "tuname": tuname or str(tid)}
+    bot_instance.reply_to(
+        msg,
+        f"🚫 Hedef: <code>{tid}</code> @{tuname or '—'}\nBan sebebini yaz:",
+        parse_mode="HTML"
+    )
 
 def _admin_ban_reason(msg, bot_instance, tid, tuname):
-    reason = msg.text.strip() or "Kural ihlali"
+    if msg.from_user.id != ADMIN_ID:
+        return
+    reason = (msg.text or "").strip() or "Kural ihlali"
     ban_user(tid, reason)
-    bot_instance.reply_to(msg, f"🚫 @{tuname or tid} yasaklandı!\n📌 Sebep: {reason}")
-    try: bot_instance.send_message(tid, f"🚫 **YASAKLANDINIZ!**\n📌 Sebep: {reason}\n📞 İtiraz için: @hackledin")
-    except: pass
+    if is_banned(tid):
+        bot_instance.reply_to(
+            msg,
+            f"✅ <b>Banlandı</b>\n👤 @{tuname or tid}\n🆔 <code>{tid}</code>\n📌 Sebep: {reason}",
+            parse_mode="HTML"
+        )
+        try:
+            bot_instance.send_message(
+                tid,
+                f"🚫 <b>YASAKLANDINIZ!</b>\n📌 Sebep: {reason}\n📞 İtiraz: @hackledin",
+                parse_mode="HTML"
+            )
+        except Exception:
+            pass
+    else:
+        bot_instance.reply_to(msg, "❌ Ban yazılamadı.")
 
 def _admin_unban(msg, bot_instance):
-    tid, tuname = _resolve_target(msg.text.strip())
-    if not tid: bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı!"); return
+    if msg.from_user.id != ADMIN_ID:
+        return
+    tid, tuname = _resolve_target((msg.text or "").strip())
+    if not tid:
+        bot_instance.reply_to(msg, "❌ Kullanıcı bulunamadı!"); return
     unban_user(tid)
-    bot_instance.reply_to(msg, f"✅ @{tuname or tid} banı kaldırıldı!")
+    if not is_banned(tid):
+        bot_instance.reply_to(
+            msg,
+            f"✅ <b>Ban kaldırıldı</b>\n👤 @{tuname or tid}\n🆔 <code>{tid}</code>",
+            parse_mode="HTML"
+        )
+        try:
+            bot_instance.send_message(tid, "✅ Banın kaldırıldı. Botu tekrar kullanabilirsin.")
+        except Exception:
+            pass
+    else:
+        bot_instance.reply_to(msg, "❌ Ban kaldırılamadı.")
 
 def _admin_announce(msg, bot_instance):
     announcement = msg.text.strip()
