@@ -61,6 +61,19 @@ PREMIUM_CAPTURE_LIMIT = 999
 FREE_KEYWORD_LIMIT = 3
 PREMIUM_KEYWORD_LIMIT = 999
 SMS_COUNT = 41
+# ══════════════════════════════════════════════════════════════
+#  🆔 ACCOUNT ID SORGU (Supabase)
+# ══════════════════════════════════════════════════════════════
+SUPABASE_URL = "https://bxqwroqjcfkofqudxuwb.supabase.co"
+SUPABASE_KEY = "sb_publishable_9KqeC8AE03BsGp0U9UOJPA_7kiC1yAs"
+ACCID_FREE_LIMIT = 1
+ACCID_PACKAGE_25 = 25
+ACCID_PACKAGE_45 = 45
+ACCID_PACKAGE_95 = 95
+ACCID_PRICE_25   = 89
+ACCID_PRICE_45   = 150
+ACCID_PRICE_95   = 380
+
 
 # ══════════════════════════════════════════════════════════════
 #  📂 LOG ÇEKME API
@@ -237,6 +250,15 @@ def db_init():
         stars INTEGER,
         date TEXT
     )''')
+    c.execute('''CREATE TABLE IF NOT EXISTS accid_users (
+        user_id INTEGER PRIMARY KEY, free_used INTEGER DEFAULT 0,
+        query_balance INTEGER DEFAULT 0, total_queries INTEGER DEFAULT 0)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS accid_purchases (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT,
+        package TEXT, queries INTEGER, stars INTEGER, date TEXT)''')
+    c.execute('''CREATE TABLE IF NOT EXISTS accid_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT, user_id INTEGER, username TEXT,
+        target TEXT, status TEXT, detail TEXT, date TEXT)''')
     conn.commit()
     conn.close()
 
@@ -667,6 +689,207 @@ def api_pref(user_id):
         return 0
 
 # ══════════════════════════════════════════════════════════════
+
+# ══════════════════════════════════════════════════════════════
+#  🆔 ACCOUNT ID SORGU (Supabase)
+# ══════════════════════════════════════════════════════════════
+def accid_init_user(user_id):
+    try:
+        conn = sqlite3.connect(DB_PATH); c = conn.cursor()
+        c.execute("INSERT OR IGNORE INTO accid_users (user_id) VALUES (?)", (user_id,))
+        conn.commit(); conn.close()
+    except: pass
+
+def accid_get(user_id, col):
+    try:
+        accid_init_user(user_id)
+        conn = sqlite3.connect(DB_PATH); c = conn.cursor()
+        c.execute(f"SELECT {col} FROM accid_users WHERE user_id=?", (user_id,))
+        r = c.fetchone(); conn.close()
+        return r[0] if r else 0
+    except: return 0
+
+def accid_set(user_id, col, val):
+    try:
+        accid_init_user(user_id)
+        conn = sqlite3.connect(DB_PATH); c = conn.cursor()
+        c.execute(f"UPDATE accid_users SET {col}=? WHERE user_id=?", (val, user_id))
+        conn.commit(); conn.close()
+    except: pass
+
+def accid_get_free_used(user_id): return accid_get(user_id, "free_used") or 0
+def accid_get_balance(user_id): return accid_get(user_id, "query_balance") or 0
+def accid_get_total(user_id): return accid_get(user_id, "total_queries") or 0
+
+def accid_can_query(user_id):
+    if user_id == ADMIN_ID: return True, "admin"
+    if accid_get_free_used(user_id) < ACCID_FREE_LIMIT: return True, "free"
+    if accid_get_balance(user_id) > 0: return True, "balance"
+    return False, None
+
+def accid_use_query(user_id):
+    if user_id == ADMIN_ID:
+        accid_set(user_id, "total_queries", accid_get_total(user_id) + 1)
+        return True, "admin"
+    free_used = accid_get_free_used(user_id)
+    if free_used < ACCID_FREE_LIMIT:
+        accid_set(user_id, "free_used", free_used + 1)
+        accid_set(user_id, "total_queries", accid_get_total(user_id) + 1)
+        return True, "free"
+    balance = accid_get_balance(user_id)
+    if balance > 0:
+        accid_set(user_id, "query_balance", balance - 1)
+        accid_set(user_id, "total_queries", accid_get_total(user_id) + 1)
+        return True, "balance"
+    return False, None
+
+def accid_add_balance(user_id, amount):
+    current = accid_get_balance(user_id); accid_set(user_id, "query_balance", current + amount)
+
+def accid_log(user_id, username, target, status, detail=""):
+    try:
+        conn = sqlite3.connect(DB_PATH); c = conn.cursor()
+        c.execute("INSERT INTO accid_logs (user_id,username,target,status,detail,date) VALUES (?,?,?,?,?,?)",
+                  (user_id, username, target, status, detail, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit(); conn.close()
+    except: pass
+
+def accid_log_purchase(user_id, username, package, queries, stars):
+    try:
+        conn = sqlite3.connect(DB_PATH); c = conn.cursor()
+        c.execute("INSERT INTO accid_purchases (user_id,username,package,queries,stars,date) VALUES (?,?,?,?,?,?)",
+                  (user_id, username, package, queries, stars, datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+        conn.commit(); conn.close()
+    except: pass
+
+def accid_search(query):
+    if not query: return None
+    q = str(query).strip()
+    if not q: return None
+    try:
+        r = requests.get(
+            f"{SUPABASE_URL}/rest/v1/accounts",
+            params={"id": f"eq.{q}", "select": "*", "limit": 1},
+            headers={"apikey": SUPABASE_KEY, "Authorization": f"Bearer {SUPABASE_KEY}", "Accept": "application/json"},
+            timeout=15
+        )
+        if r.status_code == 200:
+            data = r.json()
+            if isinstance(data, list) and data:
+                row = data[0]
+                return {
+                    "account_id": row.get("id", "") or "",
+                    "phone":      row.get("telefon", "") or row.get("phone", "") or "",
+                    "username":   row.get("kullanıcı adı", "") or row.get("username", "") or "",
+                    "first_name": row.get("first_name", "") or row.get("ilk adı", "") or "",
+                    "last_name":  row.get("soyadı", "") or row.get("soy isim", "") or row.get("last_name", "") or "",
+                    "email":      row.get("email", "") or "",
+                    "address":    row.get("address", "") or row.get("adres", "") or "",
+                    "city":       row.get("city", "") or row.get("şehir", "") or "",
+                }
+        return None
+    except Exception as e:
+        print(f"[SUPABASE ERROR] {e}")
+        return None
+
+def accid_format_emojili(kayit, aranan):
+    if not kayit: return "❌ Kayıt bulunamadı."
+    aid  = kayit.get("account_id", "—") or "—"
+    ph   = kayit.get("phone", "—") or "—"
+    un   = (kayit.get("username", "") or "").lstrip("@")
+    fn   = kayit.get("first_name", "") or ""
+    ln   = kayit.get("last_name", "") or ""
+    full = f"{fn} {ln}".strip() or "—"
+    em   = kayit.get("email", "") or ""
+    adr  = kayit.get("address", "") or ""
+    cty  = kayit.get("city", "") or ""
+    sep_heavy = "━" * 28
+    sep_light = "─" * 22
+    lines = []
+    lines.append("╔" + "═" * 30 + "╗")
+    lines.append("║    🆔  ACCOUNT ID KAYDI      ║")
+    lines.append("╚" + "═" * 30 + "╝")
+    lines.append("")
+    lines.append(f"┌{sep_light}┐")
+    lines.append("│  👤  KİMLİK BİLGİLERİ        │")
+    lines.append(f"└{sep_light}┘")
+    lines.append(f"  🆔 <b>Account ID</b>  : <code>{aid}</code>")
+    if un: lines.append(f"  🔗 <b>Username</b>    : @{un}")
+    lines.append(f"  📛 <b>İsim</b>        : {full}")
+    if fn: lines.append(f"     ├ Ad       : {fn}")
+    if ln: lines.append(f"     └ Soyad    : {ln}")
+    lines.append("")
+    lines.append(f"┌{sep_light}┐")
+    lines.append("│  📞  İLETİŞİM                │")
+    lines.append(f"└{sep_light}┘")
+    lines.append(f"  📱 <b>Telefon</b>     : <code>{ph}</code>")
+    if em: lines.append(f"  📧 <b>E-posta</b>     : <code>{em}</code>")
+    if adr: lines.append(f"  🏠 <b>Adres</b>       : {adr}")
+    if cty: lines.append(f"  🌆 <b>Şehir</b>       : {cty}")
+    lines.append("")
+    lines.append(sep_heavy)
+    lines.append(f"  🎯 Aranan: <code>{aranan}</code>")
+    lines.append(f"  🗂️ Kaynak: <b>Supabase</b>")
+    lines.append(f"  📅 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+    lines.append(sep_heavy)
+    lines.append("  🤖 🕵🏻 Cyber Search | @hackledin")
+    return "\n".join(lines)
+
+def _process_accid_search(msg, bot_instance):
+    uid = msg.from_user.id
+    query = (msg.text or "").strip()
+    if not query: bot_instance.reply_to(msg, "❌ Geçersiz ID!"); return
+    if query.lower() in ("iptal", "cancel", "q", "çık", "cik"):
+        bot_instance.reply_to(msg, "✅ İptal edildi."); return
+    allowed, source = accid_can_query(uid)
+    if not allowed:
+        free_left = max(0, ACCID_FREE_LIMIT - accid_get_free_used(uid))
+        bot_instance.reply_to(msg,
+            f"❌ <b>Sorgu hakkınız kalmadı!</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+            f"🆓 Free kalan: <b>{free_left}</b>/{ACCID_FREE_LIMIT}\n"
+            f"💰 Bakiye: <b>{accid_get_balance(uid)}</b>\n\n💎 <b>Paket satın al:</b>",
+            reply_markup=accid_packages_kb(), parse_mode="HTML")
+        return
+    wait = bot_instance.reply_to(msg, f"⏳ <code>{query}</code> aranıyor...")
+    kayit = accid_search(query)
+    if kayit:
+        accid_use_query(uid)
+        txt = accid_format_emojili(kayit, query)
+        try: bot_instance.edit_message_text(txt, msg.chat.id, wait.message_id, parse_mode="HTML")
+        except: bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+        accid_log(uid, msg.from_user.username or "", query, "OK", f"ID={kayit.get('account_id')}")
+    else:
+        try:
+            bot_instance.edit_message_text(
+                f"❌ <b>Kayıt bulunamadı!</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                f"🔍 Aranan: <code>{query}</code>\n<i>Farklı bir ID dene.</i>",
+                msg.chat.id, wait.message_id, parse_mode="HTML")
+        except: pass
+        accid_log(uid, msg.from_user.username or "", query, "FAIL", "not found")
+
+def accid_kb(user_id):
+    mk = InlineKeyboardMarkup(row_width=1)
+    free_left = max(0, ACCID_FREE_LIMIT - accid_get_free_used(user_id))
+    balance = accid_get_balance(user_id)
+    if user_id == ADMIN_ID:
+        durum = "👑 Admin — Sınırsız Sorgu"
+    else:
+        durum = f"🆓 Free: {free_left}/{ACCID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
+    mk.add(_btn(f"📊 {durum}", "noop"))
+    mk.add(_btn("🔍 Sorgu Yap", "accid_search"))
+    mk.add(_btn("💎 Paket Satın Al", "accid_packages"))
+    mk.add(_btn("📊 İstatistiklerim", "accid_my_stats"))
+    mk.add(_btn("◀️ Geri", "goto_tools"))
+    return mk
+
+def accid_packages_kb():
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(_btn(f"💎 {ACCID_PACKAGE_25} Sorgu — {ACCID_PRICE_25} ⭐", "accid_buy_25"))
+    mk.add(_btn(f"💎 {ACCID_PACKAGE_45} Sorgu — {ACCID_PRICE_45} ⭐", "accid_buy_45"))
+    mk.add(_btn(f"💎 {ACCID_PACKAGE_95} Sorgu — {ACCID_PRICE_95} ⭐", "accid_buy_95"))
+    mk.add(_btn("◀️ Geri", "tool_accid"))
+    return mk
+
 #  🆔 TELEGRAM ID SORGU - VERİTABANI FONKSİYONLARI
 # ══════════════════════════════════════════════════════════════
 def tgid_init_user(user_id):
@@ -2105,6 +2328,7 @@ def tools_kb(user_id):
         _btn("📸 EXIF Metadata", "tool_exif"),
         _btn("🆔 Telegram ID Sorgu", "tool_tgid"),
         _btn("🎨 AI Image Generator", "tool_aiimg"),
+        _btn("🆔 Account ID Sorgu", "tool_accid"),
         _btn("📂 Log Çekme", "tool_log"),
     )
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
@@ -4356,6 +4580,8 @@ def register_handlers(bot_instance):
             _btn("📂 LOG Premium Ver","adm_log_give"),
             _btn("🎨 AI Image Bakiye Ver","adm_aiimg_give"),
             _btn("➖ AI Image Bakiye Al","adm_aiimg_take"),
+            _btn("🆔 AC-ID Bakiye Ver","adm_accid_give"),
+            _btn("➖ AC-ID Bakiye Al","adm_accid_take"),
         )
         bot_instance.reply_to(msg, "👑 <b>ADMIN PANELİ</b>", reply_markup=mk)
 
@@ -4446,6 +4672,10 @@ def register_handlers(bot_instance):
                 USER_STATES.pop(uid, None)
                 _admin_aiimg_take(msg, bot_instance)
                 return
+            if action == "adm_accid_give":
+                USER_STATES.pop(uid, None); _admin_accid_give(msg, bot_instance); return
+            if action == "adm_accid_take":
+                USER_STATES.pop(uid, None); _admin_accid_take(msg, bot_instance); return
             if action == "adm_remove":
                 USER_STATES.pop(uid, None)
                 _admin_remove(msg, bot_instance)
@@ -4747,6 +4977,62 @@ def register_handlers(bot_instance):
                     bot_instance.answer_callback_query(call.id, f"❌ Hata: {e}", show_alert=True)
                 return
             # ── 🎨 AI IMAGE GENERATOR ──
+            if data == "tool_accid":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                free_left = max(0, ACCID_FREE_LIMIT - accid_get_free_used(uid))
+                balance = accid_get_balance(uid)
+                durum = "👑 Admin — Sınırsız" if uid == ADMIN_ID else f"🆓 Free: {free_left}/{ACCID_FREE_LIMIT} | 💰 {balance}"
+                txt = (f"🆔 <b>ACCOUNT ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
+                       f"🔍 Account ID'yi yaz:\n📌 Örnek: <code>123456789</code>\n\n"
+                       f"💎 Paketler: 25→89⭐ · 45→150⭐ · 95→380⭐")
+                try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=accid_kb(uid), parse_mode="HTML")
+                except: bot_instance.send_message(call.message.chat.id, txt, reply_markup=accid_kb(uid), parse_mode="HTML")
+                return
+
+            if data == "accid_search":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                m = bot_instance.send_message(call.message.chat.id, "🔍 <b>Account ID gir:</b>\n<i>İptal için <code>iptal</code></i>", parse_mode="HTML")
+                bot_instance.register_next_step_handler(m, lambda m: _process_accid_search(m, bot_instance))
+                return
+
+            if data == "accid_packages":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                txt = f"💎 <b>ACCOUNT ID PAKETLERİ</b>\n\n• <b>25 Sorgu</b> → {ACCID_PRICE_25} ⭐\n• <b>45 Sorgu</b> → {ACCID_PRICE_45} ⭐\n• <b>95 Sorgu</b> → {ACCID_PRICE_95} ⭐"
+                try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=accid_packages_kb(), parse_mode="HTML")
+                except: bot_instance.send_message(call.message.chat.id, txt, reply_markup=accid_packages_kb(), parse_mode="HTML")
+                return
+
+            if data == "accid_my_stats":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                free_used = accid_get_free_used(uid); free_left = max(0, ACCID_FREE_LIMIT - free_used)
+                balance = accid_get_balance(uid); total = accid_get_total(uid)
+                txt = f"📊 <b>ACCOUNT ID İSTATİSTİKLERİN</b>\n🔍 Toplam: <b>{total}</b>\n🆓 Free kullanılan: <b>{free_used}</b>/{ACCID_FREE_LIMIT}\n🆓 Free kalan: <b>{free_left}</b>\n💰 Bakiye: <b>{balance}</b>"
+                if uid == ADMIN_ID: txt += "\n👑 Admin — Sınırsız"
+                bot_instance.send_message(call.message.chat.id, txt, parse_mode="HTML")
+                return
+
+            if data.startswith("accid_buy_"):
+                pkg = data.replace("accid_buy_", "")
+                pkg_map = {"25":(ACCID_PACKAGE_25,ACCID_PRICE_25,"25 Sorgu"),"45":(ACCID_PACKAGE_45,ACCID_PRICE_45,"45 Sorgu"),"95":(ACCID_PACKAGE_95,ACCID_PRICE_95,"95 Sorgu")}
+                if pkg not in pkg_map:
+                    try: bot_instance.answer_callback_query(call.id, "❌ Geçersiz!", show_alert=True)
+                    except: pass
+                    return
+                qty, stars, label = pkg_map[pkg]
+                prices = [LabeledPrice(label=label, amount=stars)]
+                try:
+                    bot_instance.send_invoice(chat_id=call.message.chat.id, title=f"🆔 {label}",
+                        description=f"{qty} Account ID sorgu", invoice_payload=f"accid_{pkg}",
+                        provider_token="", currency="XTR", prices=prices)
+                    bot_instance.answer_callback_query(call.id, "✅ Fatura!")
+                except Exception as e:
+                    bot_instance.answer_callback_query(call.id, f"❌ {e}", show_alert=True)
+                return
+
             if data == "tool_aiimg":
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
@@ -5126,6 +5412,18 @@ def register_handlers(bot_instance):
             return
         username = msg.from_user.username or msg.from_user.first_name or str(uid)
         payload = msg.successful_payment.invoice_payload
+        if payload.startswith("accid_"):
+            pkg = payload.replace("accid_", "")
+            pkg_map = {"25":(ACCID_PACKAGE_25,ACCID_PRICE_25,"25 Sorgu"),"45":(ACCID_PACKAGE_45,ACCID_PRICE_45,"45 Sorgu"),"95":(ACCID_PACKAGE_95,ACCID_PRICE_95,"95 Sorgu")}
+            if pkg in pkg_map:
+                qty, stars, label = pkg_map[pkg]
+                accid_add_balance(uid, qty)
+                accid_log_purchase(uid, username, label, qty, stars)
+                bot_instance.reply_to(msg,
+                    f"🎉 <b>Ödeme Başarılı!</b>\n💎 {label}\n➕ +{qty} Account ID hakkı\n💰 Bakiye: <b>{accid_get_balance(uid)}</b>", parse_mode="HTML")
+                try: bot_instance.send_message(ADMIN_ID, f"💰 ACCID SATIN ALMA\n👤 @{username}\n📦 {label} — {stars}⭐")
+                except: pass
+            return
         if payload.startswith("tgid_"):
             pkg_num = payload.replace("tgid_", "")
             pkg_map = {"25":(TGID_PACKAGE_25,TGID_PRICE_25,"25 Sorgu"),
@@ -5971,6 +6269,18 @@ def _handle_admin_cb(call, action, bot_instance):
                 parse_mode="HTML"
             )
             return
+        elif action == "accid_give":
+            try: bot_instance.answer_callback_query(call.id)
+            except: pass
+            USER_STATES[uid] = {"action": "adm_accid_give"}
+            bot_instance.send_message(cid, "🆔 AC-ID Bakiye Ver\n<code>USER_ID MIKTAR</code>", parse_mode="HTML")
+            return
+        elif action == "accid_take":
+            try: bot_instance.answer_callback_query(call.id)
+            except: pass
+            USER_STATES[uid] = {"action": "adm_accid_take"}
+            bot_instance.send_message(cid, "➖ AC-ID Bakiye Al\n<code>USER_ID MIKTAR</code>", parse_mode="HTML")
+            return
         elif action == "remove":
             try: bot_instance.answer_callback_query(call.id)
             except: pass
@@ -6266,6 +6576,28 @@ def _admin_tgid_take(msg, bot_instance):
     current = tgid_get_balance(target); new_bal = max(0, current - amount)
     tgid_set(target, "query_balance", new_bal)
     bot_instance.reply_to(msg, f"✅ <b>TG-ID Bakiye Alındı!</b>\n🆔 Kullanıcı: <code>{target}</code>\n➖ Miktar: <b>-{amount}</b>\n💰 Yeni bakiye: <b>{new_bal}</b>")
+
+
+def _admin_accid_give(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID: return
+    try:
+        parts = msg.text.strip().split(); target = int(parts[0]); amount = int(parts[1])
+        if amount <= 0: raise ValueError
+    except: bot_instance.reply_to(msg, "❌ <code>USER_ID MIKTAR</code>", parse_mode="HTML"); return
+    add_user(target, "", ""); accid_init_user(target); accid_add_balance(target, amount)
+    bot_instance.reply_to(msg, f"✅ +{amount} ACCID hakkı: <code>{target}</code>\n💰 Bakiye: <b>{accid_get_balance(target)}</b>", parse_mode="HTML")
+    try: bot_instance.send_message(target, f"🎁 Admin +{amount} Account ID hakkı verdi!")
+    except: pass
+
+def _admin_accid_take(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID: return
+    try:
+        parts = msg.text.strip().split(); target = int(parts[0]); amount = int(parts[1])
+        if amount <= 0: raise ValueError
+    except: bot_instance.reply_to(msg, "❌ <code>USER_ID MIKTAR</code>", parse_mode="HTML"); return
+    current = accid_get_balance(target); new_bal = max(0, current - amount)
+    accid_set(target, "query_balance", new_bal)
+    bot_instance.reply_to(msg, f"✅ -{amount} ACCID: <code>{target}</code>\n💰 Yeni: <b>{new_bal}</b>", parse_mode="HTML")
 
 # ══════════════════════════════════════════════════════════════
 #  MAIN
