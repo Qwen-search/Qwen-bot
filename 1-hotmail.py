@@ -832,7 +832,7 @@ def accid_format_emojili(kayit, aranan):
     lines.append("")
     lines.append(sep_heavy)
     lines.append(f"  🎯 Aranan: <code>{aranan}</code>")
-    lines.append(f"  🗂️ Kaynak: <b>Supabase</b>")
+    lines.append(f"  🗂️ Kaynak: <b>Sherlock</b>")
     lines.append(f"  📅 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
     lines.append(sep_heavy)
     lines.append("  🤖 🕵🏻 Cyber Search | @hackledin")
@@ -1219,7 +1219,7 @@ def tgid_format_multi_html(multi, aranan):
     g = multi.get("gettg")
     if g and isinstance(g, dict):
         lines.append("")
-        lines.append("┌─ 📡 Kaynak: <b>gettg.id</b>")
+        lines.append("┌─ 📡 Kaynak: <b>Sherlock</b>")
         uid = g.get("id") or g.get("user_id") or "—"
         un = g.get("username") or ""
         fn = g.get("first_name") or g.get("firstName") or ""
@@ -1247,7 +1247,7 @@ def tgid_format_multi_html(multi, aranan):
         lines.append("└" + "─" * 22)
     elif multi.get("gettg_error"):
         lines.append("")
-        lines.append(f"📡 gettg.id: <i>{str(multi.get('gettg_error'))[:120]}</i>")
+        lines.append(f"📡 Sherlock: <i>{str(multi.get('gettg_error'))[:120]}</i>")
 
     # --- supabase ---
     s = multi.get("supabase")
@@ -1277,7 +1277,7 @@ def tgid_format_multi_html(multi, aranan):
     v = multi.get("vectra")
     if v:
         lines.append("")
-        lines.append("┌─ 🛰️ Kaynak: <b>Vectra API</b>")
+        lines.append("┌─ 🛰️ Kaynak: <b>Sherlock</b>")
         if v.get("json") and isinstance(v["json"], dict):
             for k, val in list(v["json"].items())[:20]:
                 lines.append(f"│ {k}: <code>{val}</code>")
@@ -1309,7 +1309,7 @@ def tgid_format_multi_html(multi, aranan):
     lines.append("")
     lines.append(sep)
     lines.append("🤖 🕵🏻 Cyber Search | @hackledin")
-    lines.append("<i>Kaynaklar: gettg.id · Supabase · Vectra</i>")
+    lines.append("<i>Kaynaklar: Sherlock</i>")
     return "\n".join(lines)
 
 
@@ -1619,7 +1619,7 @@ def tgid_process_search(msg, bot_instance):
     wait = bot_instance.reply_to(
         msg,
         f"⏳ <code>{username}</code> sorgulanıyor...\n"
-        f"<i>gettg.id · Account ID · Vectra</i>",
+        f"<i>Sherlock</i>",
         parse_mode="HTML",
     )
 
@@ -1656,7 +1656,7 @@ def tgid_process_search(msg, bot_instance):
             with open(fname, "w", encoding="utf-8") as f:
                 f.write(report)
             caption = tgid_summary_caption(username, g, uid)
-            caption += "\n📡 <i>Kaynaklar: gettg · Supabase · Vectra</i>"
+            caption += "\n📡 <i>Kaynaklar: Sherlock</i>"
             with open(fname, "rb") as f:
                 bot_instance.send_document(msg.chat.id, f, caption=caption, parse_mode="HTML")
             try:
@@ -5151,7 +5151,7 @@ def register_handlers(bot_instance):
                 else: durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
                 txt = (f"🆔 <b>TELEGRAM ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
                        f"🔍 Username veya sayısal ID yaz.\n"
-                       f"📡 Kaynaklar: <b>gettg.id</b> · <b>Account ID</b> · <b>Vectra</b>\n\n"
+                       f"📡 Kaynaklar: <b>Sherlock</b> · <b></b> · <b></b>\n\n"
                        f"📌 Örnek: <code>@durov</code> / <code>777000</code>\n\n"
                        f"🆓 Free: <b>1 hak</b> — bitince paket al.\n"
                        f"💎 Paketler: 25→89⭐ · 50→180⭐ · 100→250⭐")
@@ -5165,7 +5165,7 @@ def register_handlers(bot_instance):
                     "🔍 <b>Telegram ID Sorgu</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
                     "Username veya sayısal ID yaz:\n\n"
                     "📌 <b>Örnekler:</b>\n• <code>@durov</code>\n• <code>durov</code>\n• <code>5165347769</code>\n\n"
-                    "📡 Kaynaklar: gettg.id · Account ID · Vectra\n"
+                    "📡 Kaynaklar:Sherlock\n"
                     "<i>İptal için: iptal</i>",
                     parse_mode="HTML")
                 bot_instance.register_next_step_handler(m, lambda m: tgid_process_search(m, bot_instance))
@@ -5218,7 +5218,7 @@ def register_handlers(bot_instance):
                 else: durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
                 txt = (f"🆔 <b>TELEGRAM ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
                        f"🔍 Username veya sayısal ID yaz.\n"
-                       f"📡 Kaynaklar: <b>gettg.id</b> · <b>Account ID</b> · <b>Vectra</b>\n\n"
+                       f"📡 Kaynaklar: <b>Sherlock</b> · <b></b> · <b></b>\n\n"
                        f"📌 Örnek: <code>@durov</code> / <code>777000</code>\n\n"
                        f"🆓 Free: <b>1 hak</b> — bitince paket al.")
                 try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=tgid_kb(uid), parse_mode="HTML")
