@@ -3,7 +3,7 @@
 # ║         🕵🏻 Cyber Search — FULL PRODUCTION               ║
 # ║              Developer: @hackledin                       ║
 # ║  🎵 Müzik + 🎥 Video (POT ile Bot Koruması Aşıldı)      ║
-# ║  🆔 Telegram ID Sorgu (gettg.id API) — DÜZELTİLDİ!      ║
+# ║  🆔 Telegram ID Sorgu (gettg+Supabase+Vectra) BIRLESIK ║
 # ╚══════════════════════════════════════════════════════════╝
 import telebot
 import requests
@@ -87,13 +87,16 @@ LOG_FREE_MAX   = 100        # Free'nin API limit=100
 #  🆔 TELEGRAM ID SORGU (gettg.id API)
 # ══════════════════════════════════════════════════════════════
 TGID_API_BASE          = "https://www.gettg.id/api/search?username="
-TGID_FREE_LIMIT        = 5
+TGID_FREE_LIMIT        = 1   # Free kullanici sadece 1 hak
 TGID_PACKAGE_25        = 25
 TGID_PACKAGE_50        = 50
 TGID_PACKAGE_100       = 100
 TGID_PRICE_25          = 89
 TGID_PRICE_50          = 180
 TGID_PRICE_100         = 250
+# Vectra Exploits API (Telegram ID / Account ID birlesik servis)
+VECTRA_API_BASE        = "https://vectraenexploits.onlinee.bond/telegram.php"
+VECTRA_API_PARAM       = "exploits"
 
 # ══════════════════════════════════════════════════════════════
 #  🎨 AI IMAGE GENERATOR
@@ -887,7 +890,7 @@ def accid_packages_kb():
     mk.add(_btn(f"💎 {ACCID_PACKAGE_25} Sorgu — {ACCID_PRICE_25} ⭐", "accid_buy_25"))
     mk.add(_btn(f"💎 {ACCID_PACKAGE_45} Sorgu — {ACCID_PRICE_45} ⭐", "accid_buy_45"))
     mk.add(_btn(f"💎 {ACCID_PACKAGE_95} Sorgu — {ACCID_PRICE_95} ⭐", "accid_buy_95"))
-    mk.add(_btn("◀️ Geri", "tool_accid"))
+    mk.add(_btn("◀️ Geri", "tool_tgid"))
     return mk
 
 #  🆔 TELEGRAM ID SORGU - VERİTABANI FONKSİYONLARI
@@ -1122,6 +1125,192 @@ def tgid_clean_inner_json(s):
         return json.loads(s)
     except Exception:
         return None
+
+
+
+def vectra_api_search(query):
+    """Vectra Exploits Telegram lookup API.
+    Ornek: https://vectraenexploits.onlinee.bond/telegram.php?exploits=5165347769
+    Cevap genelde duz metin; JSON gelirse de destekler.
+    """
+    try:
+        q = str(query).strip().lstrip("@").strip()
+        if not q:
+            return None
+        url = f"{VECTRA_API_BASE}?{VECTRA_API_PARAM}={requests.utils.quote(q)}"
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+            "Accept": "text/html,application/json,*/*",
+        }
+        r = requests.get(url, headers=headers, timeout=20, verify=False)
+        if r.status_code != 200:
+            return {"ok": False, "raw": f"HTTP {r.status_code}", "text": r.text[:500]}
+        body = (r.text or "").strip()
+        # JSON dene
+        try:
+            js = r.json()
+            if isinstance(js, dict):
+                return {"ok": True, "json": js, "text": body}
+        except Exception:
+            pass
+        low = body.lower()
+        not_found = ("not found" in low) or ("no response" in low) or ("bulunamad" in low)
+        return {"ok": not not_found, "json": None, "text": body}
+    except Exception as e:
+        print(f"[VECTRA ERROR] {e}")
+        return {"ok": False, "raw": str(e), "text": ""}
+
+
+def tgid_multi_search(query):
+    """Tek servis: gettg.id + Supabase Account ID + Vectra API.
+    Donus: dict kaynak -> sonuc
+    """
+    q = str(query).strip().lstrip("@").strip()
+    out = {"query": q, "gettg": None, "supabase": None, "vectra": None, "any_ok": False}
+
+    # 1) gettg.id
+    try:
+        ok, data = tgid_api_search(q)
+        if ok and isinstance(data, dict):
+            out["gettg"] = data
+            out["any_ok"] = True
+        elif not ok:
+            out["gettg_error"] = data
+    except Exception as e:
+        out["gettg_error"] = str(e)
+
+    # 2) Supabase Account ID (sayisal veya genel)
+    try:
+        row = accid_search(q)
+        if row and (row.get("account_id") or row.get("phone") or row.get("first_name")):
+            out["supabase"] = row
+            out["any_ok"] = True
+    except Exception as e:
+        out["supabase_error"] = str(e)
+
+    # 3) Vectra
+    try:
+        v = vectra_api_search(q)
+        if v and v.get("ok"):
+            out["vectra"] = v
+            out["any_ok"] = True
+        elif v:
+            out["vectra"] = v  # ham metin de gosterilebilir
+    except Exception as e:
+        out["vectra_error"] = str(e)
+
+    return out
+
+
+def tgid_format_multi_html(multi, aranan):
+    """Birlesik Telegram ID / Account ID sonucunu HTML olarak formatla."""
+    sep = "━" * 28
+    lines = []
+    lines.append("╔" + "═" * 30 + "╗")
+    lines.append("║   🆔  TELEGRAM ID SORGU     ║")
+    lines.append("╚" + "═" * 30 + "╝")
+    lines.append("")
+    lines.append(f"🎯 Aranan: <code>{aranan}</code>")
+    lines.append(f"📅 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+    lines.append(sep)
+
+    # --- gettg ---
+    g = multi.get("gettg")
+    if g and isinstance(g, dict):
+        lines.append("")
+        lines.append("┌─ 📡 Kaynak: <b>gettg.id</b>")
+        uid = g.get("id") or g.get("user_id") or "—"
+        un = g.get("username") or ""
+        fn = g.get("first_name") or g.get("firstName") or ""
+        ln = g.get("last_name") or g.get("lastName") or ""
+        phone = g.get("phone") or g.get("phone_number") or ""
+        lines.append(f"│ 🆔 ID: <code>{uid}</code>")
+        if un:
+            lines.append(f"│ 🔗 Username: @{str(un).lstrip('@')}")
+        full = f"{fn} {ln}".strip()
+        if full:
+            lines.append(f"│ 📛 İsim: {full}")
+        if phone:
+            lines.append(f"│ 📱 Telefon: <code>{phone}</code>")
+        for k, label in (
+            ("is_premium", "⭐ Premium"),
+            ("is_verified", "✅ Doğrulandı"),
+            ("is_bot", "🤖 Bot"),
+            ("is_scam", "⚠️ Scam"),
+            ("is_fake", "⚠️ Fake"),
+            ("dc_id", "🖥 DC"),
+            ("about", "📝 Bio"),
+        ):
+            if k in g and g[k] not in (None, ""):
+                lines.append(f"│ {label}: {g[k]}")
+        lines.append("└" + "─" * 22)
+    elif multi.get("gettg_error"):
+        lines.append("")
+        lines.append(f"📡 gettg.id: <i>{str(multi.get('gettg_error'))[:120]}</i>")
+
+    # --- supabase ---
+    s = multi.get("supabase")
+    if s and isinstance(s, dict):
+        lines.append("")
+        lines.append("┌─ 🗄️ Kaynak: <b>Account ID (Supabase)</b>")
+        lines.append(f"│ 🆔 Account ID: <code>{s.get('account_id') or '—'}</code>")
+        un = (s.get("username") or "").lstrip("@")
+        if un:
+            lines.append(f"│ 🔗 Username: @{un}")
+        fn = s.get("first_name") or ""
+        ln = s.get("last_name") or ""
+        full = f"{fn} {ln}".strip()
+        if full:
+            lines.append(f"│ 📛 İsim: {full}")
+        if s.get("phone"):
+            lines.append(f"│ 📱 Telefon: <code>{s.get('phone')}</code>")
+        if s.get("email"):
+            lines.append(f"│ 📧 E-posta: <code>{s.get('email')}</code>")
+        if s.get("address"):
+            lines.append(f"│ 🏠 Adres: {s.get('address')}")
+        if s.get("city"):
+            lines.append(f"│ 🌆 Şehir: {s.get('city')}")
+        lines.append("└" + "─" * 22)
+
+    # --- vectra ---
+    v = multi.get("vectra")
+    if v:
+        lines.append("")
+        lines.append("┌─ 🛰️ Kaynak: <b>Vectra API</b>")
+        if v.get("json") and isinstance(v["json"], dict):
+            for k, val in list(v["json"].items())[:20]:
+                lines.append(f"│ {k}: <code>{val}</code>")
+        else:
+            raw = (v.get("text") or v.get("raw") or "").strip()
+            # Telegram HTML uyumu icin kisalt
+            if raw:
+                # satirlari al, boslari at
+                for ln in raw.splitlines():
+                    t = ln.strip()
+                    if not t:
+                        continue
+                    if t.startswith("━") or t.startswith("─") or t.startswith("🔍"):
+                        continue
+                    if "BUY API" in t or "SUPPORT" in t:
+                        continue
+                    lines.append(f"│ {t[:120]}")
+            else:
+                lines.append("│ <i>Boş cevap</i>")
+        if not v.get("ok"):
+            lines.append("│ <i>(kayıt bulunamadı veya API yanıtı negatif)</i>")
+        lines.append("└" + "─" * 22)
+
+    if not multi.get("any_ok"):
+        lines.append("")
+        lines.append("❌ <b>Hiçbir kaynakta kayıt bulunamadı.</b>")
+        lines.append("<i>Farklı bir ID / username dene.</i>")
+
+    lines.append("")
+    lines.append(sep)
+    lines.append("🤖 🕵🏻 Cyber Search | @hackledin")
+    lines.append("<i>Kaynaklar: gettg.id · Supabase · Vectra</i>")
+    return "\n".join(lines)
 
 
 def tgid_api_search(username):
@@ -1399,12 +1588,17 @@ def tgid_summary_caption(username, data, user_id):
 
 
 def tgid_process_search(msg, bot_instance):
-    """Kullanıcıdan gelen kullanıcı adını/ID'yi sorgular."""
+    """Birlesik Telegram ID Sorgu: gettg + Supabase Account ID + Vectra.
+    Free kullanici 1 hak; hak bitince paket satin alma mesaji.
+    """
     uid = msg.from_user.id
-    username = msg.text.strip().lstrip("@").strip()
+    username = (msg.text or "").strip().lstrip("@").strip()
 
     if not username:
         bot_instance.reply_to(msg, "❌ Geçersiz kullanıcı adı veya ID!")
+        return
+    if username.lower() in ("iptal", "cancel", "q", "çık", "cik"):
+        bot_instance.reply_to(msg, "✅ İptal edildi.")
         return
 
     allowed, source = tgid_can_query(uid)
@@ -1417,53 +1611,86 @@ def tgid_process_search(msg, bot_instance):
             f"🆓 Free kalan: <b>{free_left}</b>/{TGID_FREE_LIMIT}\n"
             f"💰 Bakiye: <b>{tgid_get_balance(uid)}</b>\n\n"
             f"💎 <b>Paket satın almak için aşağıdaki butona bas:</b>",
-            reply_markup=tgid_packages_kb()
+            reply_markup=tgid_packages_kb(),
+            parse_mode="HTML",
         )
         return
 
-    wait = bot_instance.reply_to(msg, f"⏳ <code>@{username}</code> sorgulanıyor...\n<i>Lütfen bekle...</i>")
+    wait = bot_instance.reply_to(
+        msg,
+        f"⏳ <code>{username}</code> sorgulanıyor...\n"
+        f"<i>gettg.id · Account ID · Vectra</i>",
+        parse_mode="HTML",
+    )
 
-    success, data = tgid_api_search(username)
-    if not success:
+    multi = tgid_multi_search(username)
+
+    if not multi.get("any_ok"):
+        txt = tgid_format_multi_html(multi, username)
         try:
-            bot_instance.edit_message_text(data, msg.chat.id, wait.message_id, parse_mode="HTML")
-        except:
-            bot_instance.send_message(msg.chat.id, data, parse_mode="HTML")
-        tgid_log_query(uid, msg.from_user.username or "", username, "FAIL", str(data)[:100])
+            bot_instance.edit_message_text(txt, msg.chat.id, wait.message_id, parse_mode="HTML")
+        except Exception:
+            bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+        tgid_log_query(uid, msg.from_user.username or "", username, "FAIL", "not found multi")
         return
 
+    # Basarili: hak dus
     tgid_use_query(uid)
+    txt = tgid_format_multi_html(multi, username)
 
-    queried_by = f"@{msg.from_user.username}" if msg.from_user.username else str(uid)
-    report = tgid_build_txt_report(username, data, queried_by)
-    fname = f"TG-ID_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-
-    try:
-        with open(fname, "w", encoding="utf-8") as f:
-            f.write(report)
-    except Exception as e:
-        bot_instance.edit_message_text(
-            f"❌ Rapor oluşturulamadı: <code>{e}</code>",
-            msg.chat.id, wait.message_id, parse_mode="HTML"
-        )
-        return
-
-    caption = tgid_summary_caption(username, data, uid)
-
-    try:
-        with open(fname, "rb") as f:
-            bot_instance.send_document(msg.chat.id, f, caption=caption, parse_mode="HTML")
-        bot_instance.delete_message(msg.chat.id, wait.message_id)
-    except Exception as e:
-        bot_instance.send_message(msg.chat.id, f"❌ Dosya gönderilemedi: <code>{e}</code>", parse_mode="HTML")
-    finally:
-        if os.path.exists(fname):
+    # gettg datasi varsa klasik TXT rapor da gonder
+    g = multi.get("gettg")
+    if g and isinstance(g, dict):
+        queried_by = f"@{msg.from_user.username}" if msg.from_user.username else str(uid)
+        report = tgid_build_txt_report(username, g, queried_by)
+        # multi ozet ekle
+        report += "\n\n" + "=" * 55 + "\nBIRLESIK KAYNAKLAR\n" + "=" * 55 + "\n"
+        if multi.get("supabase"):
+            s = multi["supabase"]
+            report += f"[Supabase] ID={s.get('account_id')} phone={s.get('phone')} name={s.get('first_name')} {s.get('last_name')}\n"
+        if multi.get("vectra"):
+            v = multi["vectra"]
+            report += f"[Vectra] ok={v.get('ok')}\n{(v.get('text') or '')[:800]}\n"
+        fname = f"TG-ID_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        try:
+            with open(fname, "w", encoding="utf-8") as f:
+                f.write(report)
+            caption = tgid_summary_caption(username, g, uid)
+            caption += "\n📡 <i>Kaynaklar: gettg · Supabase · Vectra</i>"
+            with open(fname, "rb") as f:
+                bot_instance.send_document(msg.chat.id, f, caption=caption, parse_mode="HTML")
             try:
-                os.remove(fname)
-            except:
+                bot_instance.delete_message(msg.chat.id, wait.message_id)
+            except Exception:
                 pass
-
-    tgid_log_query(uid, msg.from_user.username or "", username, "OK", f"ID={data.get('id')}")
+        except Exception as e:
+            try:
+                bot_instance.edit_message_text(txt, msg.chat.id, wait.message_id, parse_mode="HTML")
+            except Exception:
+                bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+        finally:
+            if os.path.exists(fname):
+                try:
+                    os.remove(fname)
+                except Exception:
+                    pass
+        # HTML ozet de gonder
+        try:
+            bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+        except Exception:
+            pass
+        tgid_log_query(uid, msg.from_user.username or "", username, "OK", f"ID={g.get('id')}")
+    else:
+        try:
+            bot_instance.edit_message_text(txt, msg.chat.id, wait.message_id, parse_mode="HTML")
+        except Exception:
+            bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+        detail = ""
+        if multi.get("supabase"):
+            detail = f"ACC={multi['supabase'].get('account_id')}"
+        elif multi.get("vectra"):
+            detail = "vectra"
+        tgid_log_query(uid, msg.from_user.username or "", username, "OK", detail)
 
 
 def tgid_show_my_stats(chat_id, uid, bot_instance):
@@ -2328,7 +2555,6 @@ def tools_kb(user_id):
         _btn("📸 EXIF Metadata", "tool_exif"),
         _btn("🆔 Telegram ID Sorgu", "tool_tgid"),
         _btn("🎨 AI Image Generator", "tool_aiimg"),
-        _btn("🆔 Account ID Sorgu", "tool_accid"),
         _btn("📂 Log Çekme", "tool_log"),
     )
     mk.add(_btn(s(user_id, "home_btn"), "goto_home"))
@@ -4580,8 +4806,7 @@ def register_handlers(bot_instance):
             _btn("📂 LOG Premium Ver","adm_log_give"),
             _btn("🎨 AI Image Bakiye Ver","adm_aiimg_give"),
             _btn("➖ AI Image Bakiye Al","adm_aiimg_take"),
-            _btn("🆔 AC-ID Bakiye Ver","adm_accid_give"),
-            _btn("➖ AC-ID Bakiye Al","adm_accid_take"),
+            _btn("➖ TG-ID Bakiye Al","adm_tgid_take"),
         )
         bot_instance.reply_to(msg, "👑 <b>ADMIN PANELİ</b>", reply_markup=mk)
 
@@ -4673,9 +4898,9 @@ def register_handlers(bot_instance):
                 _admin_aiimg_take(msg, bot_instance)
                 return
             if action == "adm_accid_give":
-                USER_STATES.pop(uid, None); _admin_accid_give(msg, bot_instance); return
+                USER_STATES.pop(uid, None); _admin_tgid_give(msg, bot_instance); return
             if action == "adm_accid_take":
-                USER_STATES.pop(uid, None); _admin_accid_take(msg, bot_instance); return
+                USER_STATES.pop(uid, None); _admin_tgid_take(msg, bot_instance); return
             if action == "adm_remove":
                 USER_STATES.pop(uid, None)
                 _admin_remove(msg, bot_instance)
@@ -4925,9 +5150,11 @@ def register_handlers(bot_instance):
                 elif is_premium(uid): durum = "⭐ Premium — Sınırsız"
                 else: durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
                 txt = (f"🆔 <b>TELEGRAM ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
-                       f"🔍 Telegram kullanıcı adı <b>veya</b> sayısal ID'yi sorgula.\n\n"
-                       f"<b>Desteklenen:</b>\n• 👤 Kullanıcı (username veya ID)\n• 👥 Grup\n• 📢 Kanal\n\n"
-                       f"<b>Rapor:</b> 📄 TXT dosyası olarak gelir.")
+                       f"🔍 Username veya sayısal ID yaz.\n"
+                       f"📡 Kaynaklar: <b>gettg.id</b> · <b>Account ID</b> · <b>Vectra</b>\n\n"
+                       f"📌 Örnek: <code>@durov</code> / <code>777000</code>\n\n"
+                       f"🆓 Free: <b>1 hak</b> — bitince paket al.\n"
+                       f"💎 Paketler: 25→89⭐ · 50→180⭐ · 100→250⭐")
                 try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=tgid_kb(uid), parse_mode="HTML")
                 except: bot_instance.send_message(call.message.chat.id, txt, reply_markup=tgid_kb(uid), parse_mode="HTML")
                 return
@@ -4936,8 +5163,10 @@ def register_handlers(bot_instance):
                 except: pass
                 m = bot_instance.send_message(call.message.chat.id,
                     "🔍 <b>Telegram ID Sorgu</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
-                    "Sorgulamak istediğin kullanıcı adını veya ID'yi yaz:\n\n"
-                    "📌 <b>Örnekler:</b>\n• <code>@durov</code>\n• <code>durov</code>\n• <code>7814538345</code> (sayısal ID)",
+                    "Username veya sayısal ID yaz:\n\n"
+                    "📌 <b>Örnekler:</b>\n• <code>@durov</code>\n• <code>durov</code>\n• <code>5165347769</code>\n\n"
+                    "📡 Kaynaklar: gettg.id · Account ID · Vectra\n"
+                    "<i>İptal için: iptal</i>",
                     parse_mode="HTML")
                 bot_instance.register_next_step_handler(m, lambda m: tgid_process_search(m, bot_instance))
                 return
@@ -4978,19 +5207,36 @@ def register_handlers(bot_instance):
                 return
             # ── 🎨 AI IMAGE GENERATOR ──
             if data == "tool_accid":
-                try: bot_instance.answer_callback_query(call.id)
+                # Account ID, Telegram ID servisine birlestirildi
+                try: bot_instance.answer_callback_query(call.id, "Telegram ID Sorgu'ya yönlendirildi")
                 except: pass
-                free_left = max(0, ACCID_FREE_LIMIT - accid_get_free_used(uid))
-                balance = accid_get_balance(uid)
-                durum = "👑 Admin — Sınırsız" if uid == ADMIN_ID else f"🆓 Free: {free_left}/{ACCID_FREE_LIMIT} | 💰 {balance}"
-                txt = (f"🆔 <b>ACCOUNT ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
-                       f"🔍 Account ID'yi yaz:\n📌 Örnek: <code>123456789</code>\n\n"
-                       f"💎 Paketler: 25→89⭐ · 45→150⭐ · 95→380⭐")
-                try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=accid_kb(uid), parse_mode="HTML")
-                except: bot_instance.send_message(call.message.chat.id, txt, reply_markup=accid_kb(uid), parse_mode="HTML")
+                data = "tool_tgid"
+                free_left = max(0, TGID_FREE_LIMIT - tgid_get_free_used(uid))
+                balance = tgid_get_balance(uid)
+                if uid == ADMIN_ID: durum = "👑 Admin — Sınırsız"
+                elif is_premium(uid): durum = "⭐ Premium — Sınırsız"
+                else: durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
+                txt = (f"🆔 <b>TELEGRAM ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
+                       f"🔍 Username veya sayısal ID yaz.\n"
+                       f"📡 Kaynaklar: <b>gettg.id</b> · <b>Account ID</b> · <b>Vectra</b>\n\n"
+                       f"📌 Örnek: <code>@durov</code> / <code>777000</code>\n\n"
+                       f"🆓 Free: <b>1 hak</b> — bitince paket al.")
+                try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=tgid_kb(uid), parse_mode="HTML")
+                except: bot_instance.send_message(call.message.chat.id, txt, reply_markup=tgid_kb(uid), parse_mode="HTML")
                 return
 
             if data == "accid_search":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                m = bot_instance.send_message(call.message.chat.id,
+                    "🔍 <b>Telegram ID / Account ID</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Username veya ID yaz:\n\n"
+                    "📌 <code>@durov</code> · <code>777000</code>\n"
+                    "<i>İptal: iptal</i>",
+                    parse_mode="HTML")
+                bot_instance.register_next_step_handler(m, lambda m: tgid_process_search(m, bot_instance))
+                return
+            if data == "__accid_search_disabled__":
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 m = bot_instance.send_message(call.message.chat.id, "🔍 <b>Account ID gir:</b>\n<i>İptal için <code>iptal</code></i>", parse_mode="HTML")
@@ -4998,6 +5244,16 @@ def register_handlers(bot_instance):
                 return
 
             if data == "accid_packages":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                txt = (f"💎 <b>TELEGRAM ID PAKETLERİ</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                       f"• <b>{TGID_PACKAGE_25} Sorgu</b> → {TGID_PRICE_25} ⭐\n"
+                       f"• <b>{TGID_PACKAGE_50} Sorgu</b> → {TGID_PRICE_50} ⭐\n"
+                       f"• <b>{TGID_PACKAGE_100} Sorgu</b> → {TGID_PRICE_100} ⭐")
+                try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=tgid_packages_kb(), parse_mode="HTML")
+                except: bot_instance.send_message(call.message.chat.id, txt, reply_markup=tgid_packages_kb(), parse_mode="HTML")
+                return
+            if data == "__accid_packages_disabled__":
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 txt = f"💎 <b>ACCOUNT ID PAKETLERİ</b>\n\n• <b>25 Sorgu</b> → {ACCID_PRICE_25} ⭐\n• <b>45 Sorgu</b> → {ACCID_PRICE_45} ⭐\n• <b>95 Sorgu</b> → {ACCID_PRICE_95} ⭐"
@@ -5413,34 +5669,17 @@ def register_handlers(bot_instance):
         username = msg.from_user.username or msg.from_user.first_name or str(uid)
         payload = msg.successful_payment.invoice_payload
         if payload.startswith("accid_"):
+            # Birlesik servis: Account ID satinalmalari Telegram ID bakiyesine yazilir
             pkg = payload.replace("accid_", "")
-            pkg_map = {"25":(ACCID_PACKAGE_25,ACCID_PRICE_25,"25 Sorgu"),"45":(ACCID_PACKAGE_45,ACCID_PRICE_45,"45 Sorgu"),"95":(ACCID_PACKAGE_95,ACCID_PRICE_95,"95 Sorgu")}
+            pkg_map = {"25":(TGID_PACKAGE_25,TGID_PRICE_25,"25 Sorgu"),"45":(TGID_PACKAGE_50,TGID_PRICE_50,"50 Sorgu"),"95":(TGID_PACKAGE_100,TGID_PRICE_100,"100 Sorgu"),
+                       "50":(TGID_PACKAGE_50,TGID_PRICE_50,"50 Sorgu"),"100":(TGID_PACKAGE_100,TGID_PRICE_100,"100 Sorgu")}
             if pkg in pkg_map:
                 qty, stars, label = pkg_map[pkg]
-                accid_add_balance(uid, qty)
-                accid_log_purchase(uid, username, label, qty, stars)
-                bot_instance.reply_to(msg,
-                    f"🎉 <b>Ödeme Başarılı!</b>\n💎 {label}\n➕ +{qty} Account ID hakkı\n💰 Bakiye: <b>{accid_get_balance(uid)}</b>", parse_mode="HTML")
-                try: bot_instance.send_message(ADMIN_ID, f"💰 ACCID SATIN ALMA\n👤 @{username}\n📦 {label} — {stars}⭐")
-                except: pass
-            return
-        if payload.startswith("tgid_"):
-            pkg_num = payload.replace("tgid_", "")
-            pkg_map = {"25":(TGID_PACKAGE_25,TGID_PRICE_25,"25 Sorgu"),
-                       "50":(TGID_PACKAGE_50,TGID_PRICE_50,"50 Sorgu"),
-                       "100":(TGID_PACKAGE_100,TGID_PRICE_100,"100 Sorgu")}
-            if pkg_num in pkg_map:
-                qty, stars, label = pkg_map[pkg_num]
                 tgid_add_balance(uid, qty)
                 tgid_log_purchase(uid, username, label, qty, stars)
                 bot_instance.reply_to(msg,
-                    f"🎉 <b>Ödeme Başarılı!</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
-                    f"💎 Paket: <b>{label}</b>\n➕ Eklenen: <b>+{qty}</b> Telegram ID sorgu hakkı\n"
-                    f"💰 Yeni Bakiye: <b>{tgid_get_balance(uid)}</b>\n\n"
-                    f"Hemen sorgulamaya başlayabilirsin! 🔍", parse_mode="HTML")
-                try:
-                    bot_instance.send_message(ADMIN_ID,
-                        f"💰 <b>YENİ TG-ID SATIN ALMA!</b>\n👤 @{username}\n📦 {label} — {stars} ⭐")
+                    f"🎉 <b>Ödeme Başarılı!</b>\n💎 {label}\n➕ +{qty} Telegram ID sorgu hakkı\n💰 Bakiye: <b>{tgid_get_balance(uid)}</b>", parse_mode="HTML")
+                try: bot_instance.send_message(ADMIN_ID, f"💰 TG-ID SATIN ALMA (accid payload)\n👤 @{username}\n📦 {label} — {stars}⭐")
                 except: pass
             return
         if payload.startswith("aiimg_"):
@@ -6272,14 +6511,14 @@ def _handle_admin_cb(call, action, bot_instance):
         elif action == "accid_give":
             try: bot_instance.answer_callback_query(call.id)
             except: pass
-            USER_STATES[uid] = {"action": "adm_accid_give"}
-            bot_instance.send_message(cid, "🆔 AC-ID Bakiye Ver\n<code>USER_ID MIKTAR</code>", parse_mode="HTML")
+            USER_STATES[uid] = {"action": "adm_tgid_give"}
+            bot_instance.send_message(cid, "🆔 TG-ID Bakiye Ver (birlesik servis)\n<code>USER_ID MIKTAR</code>", parse_mode="HTML")
             return
         elif action == "accid_take":
             try: bot_instance.answer_callback_query(call.id)
             except: pass
-            USER_STATES[uid] = {"action": "adm_accid_take"}
-            bot_instance.send_message(cid, "➖ AC-ID Bakiye Al\n<code>USER_ID MIKTAR</code>", parse_mode="HTML")
+            USER_STATES[uid] = {"action": "adm_tgid_take"}
+            bot_instance.send_message(cid, "➖ TG-ID Bakiye Al\n<code>USER_ID MIKTAR</code>", parse_mode="HTML")
             return
         elif action == "remove":
             try: bot_instance.answer_callback_query(call.id)
