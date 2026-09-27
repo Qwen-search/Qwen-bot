@@ -13,6 +13,7 @@ import time
 import json
 import sqlite3
 import re
+import html
 import urllib3
 import subprocess
 import sys
@@ -4959,69 +4960,133 @@ def register_handlers(bot_instance):
                 return
             _send_php2py_result(msg, bot_instance, php_src, "code.php")
             return
-        txt = msg.text
+        txt = (msg.text or "").strip()
         keys = MENU_KEYS.get(lang(uid), MENU_KEYS["tr"])
-        if txt == keys.get("combo"):
+        # Esnek eslestirme (emoji / bosluk farklari)
+        def _mk(k):
+            return (keys.get(k) or "").strip()
+        if txt == _mk("combo") or txt.endswith("Combo Çek") or txt.endswith("Combo Check"):
             m = bot_instance.reply_to(msg, s(uid, "combo_ask"))
             bot_instance.register_next_step_handler(m, lambda m: _process_combo(m, bot_instance))
-        elif txt == keys.get("tools"):
-            bot_instance.reply_to(msg, s(uid, "select_op"), reply_markup=tools_kb(uid))
-        elif txt == keys.get("stats"): _show_stats(msg.chat.id, uid, bot_instance)
-        elif txt == keys.get("profile"): _show_profile(msg.chat.id, uid, bot_instance)
-        elif txt == keys.get("lb"): _show_leaderboard(msg.chat.id, uid, bot_instance)
-        elif txt == keys.get("api"): _show_api_menu(msg.chat.id, uid, bot_instance)
-        elif txt == keys.get("help"): _show_help(msg.chat.id, uid, bot_instance)
+        elif txt == _mk("tools") or "Araçlar" in txt or "Tools" in txt or "الأدوات" in txt:
+            try:
+                bot_instance.reply_to(msg, s(uid, "select_op"), reply_markup=tools_kb(uid))
+            except Exception as e:
+                print(f"[TOOLS KB] {e}")
+                bot_instance.reply_to(msg, "🛠 Araçlar", reply_markup=tools_kb(uid))
+        elif txt == _mk("stats") or "İstatistik" in txt or "Statistics" in txt:
+            _show_stats(msg.chat.id, uid, bot_instance)
+        elif txt == _mk("profile") or "Profil" in txt or "Profile" in txt:
+            _show_profile(msg.chat.id, uid, bot_instance)
+        elif txt == _mk("lb") or "Lider" in txt or "Leaderboard" in txt:
+            _show_leaderboard(msg.chat.id, uid, bot_instance)
+        elif txt == _mk("api") or "API" in txt:
+            _show_api_menu(msg.chat.id, uid, bot_instance)
+        elif txt == _mk("help") or "Yardım" in txt or "Help" in txt:
+            _show_help(msg.chat.id, uid, bot_instance)
 
     @bot_instance.callback_query_handler(func=lambda c: True)
     def handle_cb(call):
         try:
             uid = call.from_user.id
-            data = call.data
-            # ── BAN: Tüm buton/callback engeli ──
+            data = (call.data or "").strip()
+            cid = call.message.chat.id if call.message else uid
+            mid = call.message.message_id if call.message else None
+            print(f"[CB] uid={uid} data={data!r}")
+
+            # Her callback'te once loading'i bitir (Telegram spinner)
+            def _ack(text=None, alert=False):
+                try:
+                    if text:
+                        bot_instance.answer_callback_query(call.id, text, show_alert=alert)
+                    else:
+                        bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+
+            # ── BAN ──
             if enforce_ban(uid):
+                _ack("🚫 Yasaklısınız! Botu kullanamazsınız.", alert=True)
                 try:
-                    bot_instance.answer_callback_query(
-                        call.id,
-                        "🚫 Yasaklısınız! Botu kullanamazsınız.",
-                        show_alert=True
-                    )
-                except Exception:
-                    pass
-                try:
-                    bot_instance.send_message(call.message.chat.id, ban_block_message(uid), parse_mode="HTML")
+                    bot_instance.send_message(cid, ban_block_message(uid), parse_mode="HTML")
                 except Exception:
                     pass
                 return
+
+            # ── DIL SECIMI ──
             if data.startswith("lang_"):
-                l = data[5:]
-                db_set(uid, "language", l)
-                name = call.from_user.first_name or "User"
-                status = "⭐ PREMIUM" if is_premium(uid) else "🆓 Ücretsiz"
-                try: bot_instance.answer_callback_query(call.id, s(uid, "lang_ok"))
-                except: pass
-                try: bot_instance.delete_message(call.message.chat.id, call.message.message_id)
-                except: pass
-                bot_instance.send_message(call.message.chat.id,
-                    s(uid, "welcome", name=name, status=status), reply_markup=main_kb(uid))
-                return
-            if data == "noop":
-                try: bot_instance.answer_callback_query(call.id)
-                except: pass
-                return
-            if data == "goto_home":
-                try: bot_instance.delete_message(call.message.chat.id, call.message.message_id)
-                except: pass
-                bot_instance.send_message(call.message.chat.id, "🏠", reply_markup=main_kb(uid))
-                try: bot_instance.answer_callback_query(call.id)
-                except: pass
-                return
-            if data == "goto_tools":
-                try: bot_instance.answer_callback_query(call.id)
-                except: pass
+                l = data.replace("lang_", "", 1)
+                if l not in ("tr", "en", "ar"):
+                    l = "tr"
                 try:
-                    bot_instance.edit_message_text(s(uid, "select_op"), call.message.chat.id,
-                                                   call.message.message_id, reply_markup=tools_kb(uid))
-                except: bot_instance.send_message(call.message.chat.id, s(uid, "select_op"), reply_markup=tools_kb(uid))
+                    add_user(uid, call.from_user.username or "", call.from_user.first_name or "")
+                    db_set(uid, "language", l)
+                except Exception as e:
+                    print(f"[LANG DB] {e}")
+                _ack("✅")
+                name = html.escape(call.from_user.first_name or "User")
+                status = "⭐ PREMIUM" if is_premium(uid) else "🆓 Ücretsiz"
+                welcome = s(uid, "welcome", name=name, status=status)
+                # Mesaji guncelle veya yeni gonder
+                sent = False
+                if mid is not None:
+                    try:
+                        bot_instance.edit_message_text(
+                            welcome, cid, mid, parse_mode="HTML"
+                        )
+                        sent = True
+                    except Exception:
+                        try:
+                            bot_instance.delete_message(cid, mid)
+                        except Exception:
+                            pass
+                if not sent:
+                    try:
+                        bot_instance.send_message(cid, welcome, parse_mode="HTML", reply_markup=main_kb(uid))
+                    except Exception as e:
+                        print(f"[LANG SEND] {e}")
+                        try:
+                            bot_instance.send_message(cid, welcome, reply_markup=main_kb(uid))
+                        except Exception as e2:
+                            print(f"[LANG SEND2] {e2}")
+                else:
+                    # Reply keyboard ayri mesaj ile (edit_message reply_markup inline kalir)
+                    try:
+                        bot_instance.send_message(cid, "👇", reply_markup=main_kb(uid))
+                    except Exception:
+                        pass
+                return
+
+            if data == "noop":
+                _ack()
+                return
+
+            if data == "goto_home":
+                _ack()
+                try:
+                    if mid is not None:
+                        bot_instance.delete_message(cid, mid)
+                except Exception:
+                    pass
+                try:
+                    bot_instance.send_message(cid, "🏠 Ana Menü", reply_markup=main_kb(uid))
+                except Exception as e:
+                    print(f"[HOME] {e}")
+                return
+
+            if data == "goto_tools":
+                _ack()
+                txt = s(uid, "select_op")
+                try:
+                    if mid is not None:
+                        bot_instance.edit_message_text(txt, cid, mid, reply_markup=tools_kb(uid))
+                    else:
+                        raise Exception("no mid")
+                except Exception:
+                    try:
+                        bot_instance.send_message(cid, txt, reply_markup=tools_kb(uid))
+                    except Exception as e:
+                        print(f"[TOOLS] {e}")
                 return
             if data == "menu_turkey":
                 try: bot_instance.answer_callback_query(call.id)
@@ -5639,9 +5704,13 @@ def register_handlers(bot_instance):
                                edit=(call.message.chat.id, call.message.message_id))
                 return
         except Exception as e:
-            print(f"[CALLBACK ERROR] {e}")
-            try: bot_instance.answer_callback_query(call.id, "⚠️ Bir hata oluştu!", show_alert=True)
-            except: pass
+            import traceback
+            print(f"[CALLBACK ERROR] data={getattr(call,'data',None)} err={e}")
+            traceback.print_exc()
+            try:
+                bot_instance.answer_callback_query(call.id, "⚠️ Bir hata oluştu!", show_alert=True)
+            except Exception:
+                pass
 
     @bot_instance.pre_checkout_query_handler(func=lambda q: True)
     def precheckout(q):
