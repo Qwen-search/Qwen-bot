@@ -6902,64 +6902,146 @@ def _admin_accid_take(msg, bot_instance):
 # ══════════════════════════════════════════════════════════════
 #  MAIN
 # ══════════════════════════════════════════════════════════════
+
+def _force_delete_webhook(token, label="BOT"):
+    """409 Conflict cozumu: webhook'u HTTP ile zorla sil, sonucu logla."""
+    token = (token or "").strip()
+    if not token:
+        return False
+    base = f"https://api.telegram.org/bot{token}"
+    ok = False
+    try:
+        # 1) Mevcut webhook bilgisini goster
+        try:
+            info = requests.get(f"{base}/getWebhookInfo", timeout=15).json()
+            wh = (info.get("result") or {})
+            url = wh.get("url") or ""
+            print(f"[{label}] getWebhookInfo url={url!r} pending={wh.get('pending_update_count')}")
+        except Exception as e:
+            print(f"[{label}] getWebhookInfo hata: {e}")
+
+        # 2) deleteWebhook (birkaç deneme)
+        for attempt in range(1, 4):
+            try:
+                r = requests.get(
+                    f"{base}/deleteWebhook",
+                    params={"drop_pending_updates": "true"},
+                    timeout=20,
+                )
+                data = r.json() if r.content else {}
+                print(f"[{label}] deleteWebhook try#{attempt}: HTTP {r.status_code} -> {data}")
+                if data.get("ok"):
+                    ok = True
+                    break
+            except Exception as e:
+                print(f"[{label}] deleteWebhook try#{attempt} hata: {e}")
+            time.sleep(1)
+
+        # 3) telebot uzerinden de dene
+        try:
+            b = telebot.TeleBot(token)
+            b.delete_webhook(drop_pending_updates=True)
+            print(f"[{label}] telebot.delete_webhook OK")
+            ok = True
+        except Exception as e:
+            print(f"[{label}] telebot.delete_webhook: {e}")
+
+        # 4) Dogrula
+        try:
+            info2 = requests.get(f"{base}/getWebhookInfo", timeout=15).json()
+            url2 = ((info2.get("result") or {}).get("url")) or ""
+            print(f"[{label}] webhook son durum url={url2!r}")
+            if url2:
+                print(f"[{label}] UYARI: Webhook hala dolu! Baska bir servis set ediyor olabilir.")
+            else:
+                ok = True
+        except Exception as e:
+            print(f"[{label}] dogrulama hata: {e}")
+    except Exception as e:
+        print(f"[{label}] _force_delete_webhook fatal: {e}")
+    return ok
+
+
 if __name__ == "__main__":
-    child_mode = False; child_token = None
+    child_mode = False
+    child_token = None
     argv = sys.argv[1:]
     for i, arg in enumerate(argv):
         if arg == "--bot" and i + 1 < len(argv):
-            child_mode = True; child_token = argv[i + 1]
+            child_mode = True
+            child_token = argv[i + 1]
+
     if child_mode and child_token:
         print(f"[CHILD] Starting bot with token: {child_token[:10]}...")
-        child_bot = telebot.TeleBot(child_token, parse_mode="HTML")
-        # Webhook aktifse polling 409 verir — once sil
-        try:
-            child_bot.delete_webhook(drop_pending_updates=True)
-            print(f"[CHILD] Webhook silindi (polling hazir).")
-        except Exception as e:
-            print(f"[CHILD] delete_webhook: {e}")
+        _force_delete_webhook(child_token, "CHILD")
+        child_bot = telebot.TeleBot(child_token, parse_mode="HTML", threaded=True)
         register_handlers(child_bot)
         print(f"[CHILD] Bot {child_token[:10]}... ready!")
-        try:
-            child_bot.infinity_polling(timeout=60, long_polling_timeout=60)
-        except Exception as e:
-            print(f"[CHILD] Polling error: {e}")
+        while True:
+            try:
+                _force_delete_webhook(child_token, "CHILD")
+                child_bot.infinity_polling(
+                    timeout=60,
+                    long_polling_timeout=50,
+                    none_stop=True,
+                    interval=0,
+                    allowed_updates=[
+                        "message", "callback_query", "pre_checkout_query",
+                        "successful_payment", "edited_message",
+                    ],
+                )
+            except Exception as e:
+                print(f"[CHILD] Polling error: {e}")
+                time.sleep(3)
         sys.exit(0)
 
-    main_bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
-    # 409 Conflict fix: webhook aktifken getUpdates kullanilamaz
-    try:
-        main_bot.delete_webhook(drop_pending_updates=True)
-        print("[MAIN] Webhook silindi — polling baslatiliyor.")
-    except Exception as e:
-        print(f"[MAIN] delete_webhook uyarisi: {e}")
+    # ── ANA BOT ──
+    print("[MAIN] Webhook temizleniyor (409 fix)...")
+    _force_delete_webhook(BOT_TOKEN, "MAIN")
+    time.sleep(1)
+
+    main_bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML", threaded=True)
     register_handlers(main_bot)
+
+    # Kayitli child botlari baslat (ayri process; ayni token'i atlar)
     print("[MAIN] Starting saved bots...")
-    start_saved_bots()
+    try:
+        start_saved_bots()
+    except Exception as e:
+        print(f"[MAIN] start_saved_bots: {e}")
+
     print("""
 ╔══════════════════════════════════════════════════════╗
 ║       🕵🏻 Cyber Search — PRODUCTION                   ║
 ║         Developer: @hackledin                        ║
 ╠══════════════════════════════════════════════════════╣
-║  ✅ YouTube POT Provider                             ║
-║  ✅ Müzik İndirici                                   ║
-║  ✅ Video İndirici                                   ║
-║  ✅ Adres Sorgu                                      ║
-║  ✅ Hotmail Checker v4.0                             ║
-║  ✅ Capture Tool                                     ║
-║  ✅ SMS Bomber (41+ Servis)                          ║
-║  ✅ EXIF Metadata                                    ║
+║  ✅ Webhook force-delete (409 fix)                   ║
 ║  ✅ Telegram ID Sorgu (Sherlock)                     ║
-║  ✅ Türkçe / English / العربية                       ║
+║  ✅ Hotmail · SMS · AI · LOG · EXIF                  ║
 ╚══════════════════════════════════════════════════════╝
 """)
+
     while True:
         try:
-            # Her yeniden denemede webhook'u temizle (deploy/webhook kalintisi icin)
-            try:
-                main_bot.delete_webhook(drop_pending_updates=False)
-            except Exception:
-                pass
-            main_bot.infinity_polling(timeout=60, long_polling_timeout=60, none_stop=True)
+            print("[MAIN] Polling basliyor...")
+            _force_delete_webhook(BOT_TOKEN, "MAIN")
+            time.sleep(0.5)
+            main_bot.infinity_polling(
+                timeout=60,
+                long_polling_timeout=50,
+                none_stop=True,
+                interval=0,
+                allowed_updates=[
+                    "message", "callback_query", "pre_checkout_query",
+                    "successful_payment", "edited_message",
+                ],
+            )
         except Exception as e:
-            print(f"[HATA] {e}")
-            time.sleep(5)
+            err = str(e)
+            print(f"[HATA] {err}")
+            if "409" in err or "Conflict" in err or "webhook" in err.lower():
+                print("[MAIN] 409 algilandi — webhook tekrar siliniyor, 5sn bekleniyor...")
+                _force_delete_webhook(BOT_TOKEN, "MAIN")
+                time.sleep(5)
+            else:
+                time.sleep(5)
