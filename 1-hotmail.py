@@ -3,7 +3,7 @@
 # ║         🕵🏻 Cyber Search — FULL PRODUCTION               ║
 # ║              Developer: @hackledin                       ║
 # ║  🎵 Müzik + 🎥 Video (POT ile Bot Koruması Aşıldı)      ║
-# ║  🆔 Telegram ID Sorgu (gettg+Supabase+Vectra) BIRLESIK ║
+# ║  🆔 Telegram ID Sorgu (Sherlock)                      ║
 # ╚══════════════════════════════════════════════════════════╝
 import telebot
 import requests
@@ -1204,7 +1204,7 @@ def tgid_multi_search(query):
 
 
 def tgid_format_multi_html(multi, aranan):
-    """Birlesik Telegram ID / Account ID sonucunu HTML olarak formatla."""
+    """Birlesik Telegram ID sonucunu HTML olarak formatla. Kaynak adi: Sherlock."""
     sep = "━" * 28
     lines = []
     lines.append("╔" + "═" * 30 + "╗")
@@ -1213,26 +1213,28 @@ def tgid_format_multi_html(multi, aranan):
     lines.append("")
     lines.append(f"🎯 Aranan: <code>{aranan}</code>")
     lines.append(f"📅 {datetime.now().strftime('%d.%m.%Y %H:%M:%S')}")
+    lines.append(f"📡 Kaynak: <b>Sherlock</b>")
     lines.append(sep)
 
-    # --- gettg ---
+    has_data = False
+
     g = multi.get("gettg")
     if g and isinstance(g, dict):
+        has_data = True
         lines.append("")
-        lines.append("┌─ 📡 Kaynak: <b>Sherlock</b>")
         uid = g.get("id") or g.get("user_id") or "—"
         un = g.get("username") or ""
         fn = g.get("first_name") or g.get("firstName") or ""
         ln = g.get("last_name") or g.get("lastName") or ""
         phone = g.get("phone") or g.get("phone_number") or ""
-        lines.append(f"│ 🆔 ID: <code>{uid}</code>")
+        lines.append(f"🆔 <b>ID</b>: <code>{uid}</code>")
         if un:
-            lines.append(f"│ 🔗 Username: @{str(un).lstrip('@')}")
+            lines.append(f"🔗 <b>Username</b>: @{str(un).lstrip('@')}")
         full = f"{fn} {ln}".strip()
         if full:
-            lines.append(f"│ 📛 İsim: {full}")
+            lines.append(f"📛 <b>İsim</b>: {full}")
         if phone:
-            lines.append(f"│ 📱 Telefon: <code>{phone}</code>")
+            lines.append(f"📱 <b>Telefon</b>: <code>{phone}</code>")
         for k, label in (
             ("is_premium", "⭐ Premium"),
             ("is_verified", "✅ Doğrulandı"),
@@ -1243,74 +1245,64 @@ def tgid_format_multi_html(multi, aranan):
             ("about", "📝 Bio"),
         ):
             if k in g and g[k] not in (None, ""):
-                lines.append(f"│ {label}: {g[k]}")
-        lines.append("└" + "─" * 22)
-    elif multi.get("gettg_error"):
-        lines.append("")
-        lines.append(f"📡 Sherlock: <i>{str(multi.get('gettg_error'))[:120]}</i>")
+                lines.append(f"{label}: {g[k]}")
 
-    # --- supabase ---
     s = multi.get("supabase")
     if s and isinstance(s, dict):
+        has_data = True
         lines.append("")
-        lines.append("┌─ 🗄️ Kaynak: <b>Account ID (Supabase)</b>")
-        lines.append(f"│ 🆔 Account ID: <code>{s.get('account_id') or '—'}</code>")
+        aid = s.get("account_id") or "—"
+        lines.append(f"🆔 <b>Account ID</b>: <code>{aid}</code>")
         un = (s.get("username") or "").lstrip("@")
         if un:
-            lines.append(f"│ 🔗 Username: @{un}")
+            lines.append(f"🔗 <b>Username</b>: @{un}")
         fn = s.get("first_name") or ""
         ln = s.get("last_name") or ""
         full = f"{fn} {ln}".strip()
         if full:
-            lines.append(f"│ 📛 İsim: {full}")
+            lines.append(f"📛 <b>İsim</b>: {full}")
         if s.get("phone"):
-            lines.append(f"│ 📱 Telefon: <code>{s.get('phone')}</code>")
+            lines.append(f"📱 <b>Telefon</b>: <code>{s.get('phone')}</code>")
         if s.get("email"):
-            lines.append(f"│ 📧 E-posta: <code>{s.get('email')}</code>")
+            lines.append(f"📧 <b>E-posta</b>: <code>{s.get('email')}</code>")
         if s.get("address"):
-            lines.append(f"│ 🏠 Adres: {s.get('address')}")
+            lines.append(f"🏠 <b>Adres</b>: {s.get('address')}")
         if s.get("city"):
-            lines.append(f"│ 🌆 Şehir: {s.get('city')}")
-        lines.append("└" + "─" * 22)
+            lines.append(f"🌆 <b>Şehir</b>: {s.get('city')}")
 
-    # --- vectra ---
     v = multi.get("vectra")
-    if v:
+    if v and v.get("ok"):
+        has_data = True
         lines.append("")
-        lines.append("┌─ 🛰️ Kaynak: <b>Sherlock</b>")
         if v.get("json") and isinstance(v["json"], dict):
             for k, val in list(v["json"].items())[:20]:
-                lines.append(f"│ {k}: <code>{val}</code>")
+                lines.append(f"{k}: <code>{val}</code>")
         else:
             raw = (v.get("text") or v.get("raw") or "").strip()
-            # Telegram HTML uyumu icin kisalt
             if raw:
-                # satirlari al, boslari at
                 for ln in raw.splitlines():
-                    t = ln.strip()
-                    if not t:
+                    tt = ln.strip()
+                    if not tt:
                         continue
-                    if t.startswith("━") or t.startswith("─") or t.startswith("🔍"):
+                    if tt.startswith("━") or tt.startswith("─") or tt.startswith("🔍"):
                         continue
-                    if "BUY API" in t or "SUPPORT" in t:
+                    if "BUY API" in tt or "SUPPORT" in tt:
                         continue
-                    lines.append(f"│ {t[:120]}")
-            else:
-                lines.append("│ <i>Boş cevap</i>")
-        if not v.get("ok"):
-            lines.append("│ <i>(kayıt bulunamadı veya API yanıtı negatif)</i>")
-        lines.append("└" + "─" * 22)
+                    if "NOT FOUND" in tt.upper() or "No Response" in tt:
+                        continue
+                    lines.append(tt[:120])
 
-    if not multi.get("any_ok"):
+    if not multi.get("any_ok") and not has_data:
         lines.append("")
-        lines.append("❌ <b>Hiçbir kaynakta kayıt bulunamadı.</b>")
+        lines.append("❌ <b>Kayıt bulunamadı.</b>")
         lines.append("<i>Farklı bir ID / username dene.</i>")
 
     lines.append("")
     lines.append(sep)
     lines.append("🤖 🕵🏻 Cyber Search | @hackledin")
-    lines.append("<i>Kaynaklar: Sherlock</i>")
+    lines.append("📡 Kaynak: <b>Sherlock</b>")
     return "\n".join(lines)
+
 
 
 def tgid_api_search(username):
@@ -1647,16 +1639,16 @@ def tgid_process_search(msg, bot_instance):
         report += "\n\n" + "=" * 55 + "\nBIRLESIK KAYNAKLAR\n" + "=" * 55 + "\n"
         if multi.get("supabase"):
             s = multi["supabase"]
-            report += f"[Supabase] ID={s.get('account_id')} phone={s.get('phone')} name={s.get('first_name')} {s.get('last_name')}\n"
+            report += f"[Sherlock] ID={s.get('account_id')} phone={s.get('phone')} name={s.get('first_name')} {s.get('last_name')}\n"
         if multi.get("vectra"):
             v = multi["vectra"]
-            report += f"[Vectra] ok={v.get('ok')}\n{(v.get('text') or '')[:800]}\n"
+            report += f"[Sherlock] ok={v.get('ok')}\n{(v.get('text') or '')[:800]}\n"
         fname = f"TG-ID_{username}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
         try:
             with open(fname, "w", encoding="utf-8") as f:
                 f.write(report)
             caption = tgid_summary_caption(username, g, uid)
-            caption += "\n📡 <i>Kaynaklar: Sherlock</i>"
+            caption += "\n📡 <i>Kaynak: Sherlock</i>"
             with open(fname, "rb") as f:
                 bot_instance.send_document(msg.chat.id, f, caption=caption, parse_mode="HTML")
             try:
@@ -5151,7 +5143,7 @@ def register_handlers(bot_instance):
                 else: durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
                 txt = (f"🆔 <b>TELEGRAM ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
                        f"🔍 Username veya sayısal ID yaz.\n"
-                       f"📡 Kaynaklar: <b>Sherlock</b> · <b></b> · <b></b>\n\n"
+                       f"📡 Kaynak: <b>Sherlock</b>\n\n"
                        f"📌 Örnek: <code>@durov</code> / <code>777000</code>\n\n"
                        f"🆓 Free: <b>1 hak</b> — bitince paket al.\n"
                        f"💎 Paketler: 25→89⭐ · 50→180⭐ · 100→250⭐")
@@ -5165,7 +5157,7 @@ def register_handlers(bot_instance):
                     "🔍 <b>Telegram ID Sorgu</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
                     "Username veya sayısal ID yaz:\n\n"
                     "📌 <b>Örnekler:</b>\n• <code>@durov</code>\n• <code>durov</code>\n• <code>5165347769</code>\n\n"
-                    "📡 Kaynaklar:Sherlock\n"
+                    "📡 Kaynak: Sherlock\n"
                     "<i>İptal için: iptal</i>",
                     parse_mode="HTML")
                 bot_instance.register_next_step_handler(m, lambda m: tgid_process_search(m, bot_instance))
@@ -5218,7 +5210,7 @@ def register_handlers(bot_instance):
                 else: durum = f"🆓 Free: {free_left}/{TGID_FREE_LIMIT}  |  💰 Bakiye: {balance}"
                 txt = (f"🆔 <b>TELEGRAM ID SORGU</b>\n━━━━━━━━━━━━━━━━━━━━━\n📊 {durum}\n\n"
                        f"🔍 Username veya sayısal ID yaz.\n"
-                       f"📡 Kaynaklar: <b>Sherlock</b> · <b></b> · <b></b>\n\n"
+                       f"📡 Kaynak: <b>Sherlock</b>\n\n"
                        f"📌 Örnek: <code>@durov</code> / <code>777000</code>\n\n"
                        f"🆓 Free: <b>1 hak</b> — bitince paket al.")
                 try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=tgid_kb(uid), parse_mode="HTML")
@@ -6850,12 +6842,27 @@ if __name__ == "__main__":
     if child_mode and child_token:
         print(f"[CHILD] Starting bot with token: {child_token[:10]}...")
         child_bot = telebot.TeleBot(child_token, parse_mode="HTML")
+        # Webhook aktifse polling 409 verir — once sil
+        try:
+            child_bot.delete_webhook(drop_pending_updates=True)
+            print(f"[CHILD] Webhook silindi (polling hazir).")
+        except Exception as e:
+            print(f"[CHILD] delete_webhook: {e}")
         register_handlers(child_bot)
         print(f"[CHILD] Bot {child_token[:10]}... ready!")
-        try: child_bot.infinity_polling(timeout=60)
-        except Exception as e: print(f"[CHILD] Polling error: {e}")
+        try:
+            child_bot.infinity_polling(timeout=60, long_polling_timeout=60)
+        except Exception as e:
+            print(f"[CHILD] Polling error: {e}")
         sys.exit(0)
+
     main_bot = telebot.TeleBot(BOT_TOKEN, parse_mode="HTML")
+    # 409 Conflict fix: webhook aktifken getUpdates kullanilamaz
+    try:
+        main_bot.delete_webhook(drop_pending_updates=True)
+        print("[MAIN] Webhook silindi — polling baslatiliyor.")
+    except Exception as e:
+        print(f"[MAIN] delete_webhook uyarisi: {e}")
     register_handlers(main_bot)
     print("[MAIN] Starting saved bots...")
     start_saved_bots()
@@ -6872,11 +6879,18 @@ if __name__ == "__main__":
 ║  ✅ Capture Tool                                     ║
 ║  ✅ SMS Bomber (41+ Servis)                          ║
 ║  ✅ EXIF Metadata                                    ║
-║  ✅ Telegram ID Sorgu (DÜZELTİLDİ!)                  ║
+║  ✅ Telegram ID Sorgu (Sherlock)                     ║
 ║  ✅ Türkçe / English / العربية                       ║
 ╚══════════════════════════════════════════════════════╝
 """)
     while True:
-        try: main_bot.polling(none_stop=True, timeout=60)
+        try:
+            # Her yeniden denemede webhook'u temizle (deploy/webhook kalintisi icin)
+            try:
+                main_bot.delete_webhook(drop_pending_updates=False)
+            except Exception:
+                pass
+            main_bot.infinity_polling(timeout=60, long_polling_timeout=60, none_stop=True)
         except Exception as e:
-            print(f"[HATA] {e}"); time.sleep(5)
+            print(f"[HATA] {e}")
+            time.sleep(5)
