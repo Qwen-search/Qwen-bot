@@ -2697,7 +2697,7 @@ TURKEY_PROMPTS = {
 
 def tools_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
-    lmnx_txt = "🛠 LMNX Tools ⭐" if (user_id == ADMIN_ID or is_premium_lmnx(user_id)) else "🛠 LMNX Tools 🔒"
+    lmnx_txt = "🔴 LMNX Tools — Bakımda"
     mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn(lmnx_txt, "menu_lmnx"))
     mk.add(
         _btn("🎮 MC Bedrock", "tool_bedrock"), _btn("💳 CC Generator", "tool_ccgen"),
@@ -5264,94 +5264,62 @@ def register_handlers(bot_instance):
                 except: bot_instance.send_message(call.message.chat.id, "🇹🇷", reply_markup=turkey_kb(uid))
                 return
             if data == "menu_lmnx":
-                try: bot_instance.answer_callback_query(call.id)
-                except: pass
+                try:
+                    bot_instance.answer_callback_query(
+                        call.id,
+                        "Bu servis su anda bakimdadir.",
+                        show_alert=True
+                    )
+                except Exception:
+                    pass
+                mk = InlineKeyboardMarkup(row_width=1)
+                mk.add(_btn("◀️ Geri", "goto_tools"))
                 txt = (
-                    "🛠 <b>LMNX TOOLS</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
-                    "🤖 AI araçları: <b>ÜCRETSİZ</b>\n"
-                    f"🌐 Network / Crypto / Info: <b>Premium {LMNX_PRICE}⭐</b>\n\n"
-                    "Kategori seç:"
+                    "🔴 <b>LMNX TOOLS — BAKIMDA</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
+                    "⚠️ Bu servis şu anda <b>bakımdadır</b>.\n"
+                    "Lütfen daha sonra tekrar deneyin.\n\n"
+                    "📢 Gelişmeler için botu takip et."
                 )
                 try:
-                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
-                                                   reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
-                except:
-                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
-                return
-            if data.startswith("lmnx_cat_"):
-                try: bot_instance.answer_callback_query(call.id)
-                except: pass
-                cat = data.replace("lmnx_cat_", "", 1)
-                if cat not in LMNX_CATS:
-                    return
-                title, keys = LMNX_CATS[cat]
-                try:
                     bot_instance.edit_message_text(
-                        f"{title}\nAraç seç:",
-                        call.message.chat.id, call.message.message_id,
-                        reply_markup=lmnx_cat_kb(uid, cat), parse_mode="HTML")
-                except:
-                    bot_instance.send_message(call.message.chat.id, f"{title}", reply_markup=lmnx_cat_kb(uid, cat))
-                return
-            if data.startswith("lmnx_tool_"):
-                key = data.replace("lmnx_tool_", "", 1)
-                if key not in LMNX_APIS:
-                    try: bot_instance.answer_callback_query(call.id, "Gecersiz", show_alert=True)
-                    except: pass
-                    return
-                url_t, name, prompt, cat, free = LMNX_APIS[key]
-                if not lmnx_can_use(uid, key):
-                    try: bot_instance.answer_callback_query(call.id, f"⭐ LMNX Premium gerekli ({LMNX_PRICE}⭐)", show_alert=True)
-                    except: pass
-                    mk = InlineKeyboardMarkup()
-                    mk.add(_btn(f"⭐ Premium Al ({LMNX_PRICE}⭐)", "buy_lmnx"))
-                    mk.add(_btn("◀️ Geri", "menu_lmnx"))
-                    bot_instance.send_message(call.message.chat.id,
-                        f"🔒 <b>{name}</b> Premium gerektirir.\n💰 Fiyat: {LMNX_PRICE}⭐",
-                        reply_markup=mk, parse_mode="HTML")
-                    return
-                try: bot_instance.answer_callback_query(call.id)
-                except: pass
-                # Tempmail create: no input
-                if key == "lmnx_mailc" or prompt is None:
-                    sm = bot_instance.send_message(call.message.chat.id, f"⏳ <b>{name}</b>...", parse_mode="HTML")
-                    _process_lmnx(call.message, key, "", bot_instance, sm)
-                    return
-                m = bot_instance.send_message(call.message.chat.id,
-                    f"🛠 <b>{name}</b>\n{prompt}\n<i>Iptal: iptal</i>", parse_mode="HTML")
-                bot_instance.register_next_step_handler(m, lambda m, k=key: _process_lmnx_step(m, k, bot_instance))
-                return
-            if data == "buy_lmnx":
-                if is_premium_lmnx(uid):
-                    try: bot_instance.answer_callback_query(call.id, "Zaten LMNX Premium!", show_alert=True)
-                    except: pass
-                    return
-                prices = [LabeledPrice(label="🛠 LMNX Tools Premium", amount=LMNX_PRICE)]
-                try:
-                    bot_instance.send_invoice(
-                        chat_id=call.message.chat.id,
-                        title="🛠 LMNX Tools Premium",
-                        description="Network, Crypto, Info, TempMail — omur boyu",
-                        invoice_payload="lmnx",
-                        provider_token="",
-                        currency="XTR",
-                        prices=prices,
+                        txt, call.message.chat.id, call.message.message_id,
+                        reply_markup=mk, parse_mode="HTML"
                     )
-                    bot_instance.answer_callback_query(call.id, "Fatura gonderildi")
-                except Exception as e:
-                    bot_instance.answer_callback_query(call.id, f"Hata: {e}", show_alert=True)
+                except Exception:
+                    bot_instance.send_message(
+                        call.message.chat.id, txt, reply_markup=mk, parse_mode="HTML"
+                    )
+                return
+            if data.startswith("lmnx_cat_") or data.startswith("lmnx_tool_") or data == "buy_lmnx":
+                try:
+                    bot_instance.answer_callback_query(
+                        call.id, "Bu servis bakimdadir.", show_alert=True
+                    )
+                except Exception:
+                    pass
                 return
             if data == "menu_ls":
-                # LeakSights kaldirildi -> LMNX
-                try: bot_instance.answer_callback_query(call.id, "LeakSights kaldirildi")
-                except: pass
-                data = "menu_lmnx"
-                txt = "🛠 <b>LMNX TOOLS</b> (LeakSights yerine)"
                 try:
-                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
-                                                   reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
-                except:
-                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
+                    bot_instance.answer_callback_query(call.id, "Bu servis bakimdadir.", show_alert=True)
+                except Exception:
+                    pass
+                mk = InlineKeyboardMarkup(row_width=1)
+                mk.add(_btn("◀️ Geri", "goto_tools"))
+                txt = (
+                    "🔴 <b>LMNX TOOLS — BAKIMDA</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
+                    "⚠️ Bu servis şu anda <b>bakımdadır</b>."
+                )
+                try:
+                    bot_instance.edit_message_text(
+                        txt, call.message.chat.id, call.message.message_id,
+                        reply_markup=mk, parse_mode="HTML"
+                    )
+                except Exception:
+                    bot_instance.send_message(
+                        call.message.chat.id, txt, reply_markup=mk, parse_mode="HTML"
+                    )
                 return
             if data == "buy_premium":
                 if is_premium(uid):
