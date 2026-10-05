@@ -54,6 +54,7 @@ DB_PATH       = "cyber_searcher.db"
 BOT_REGISTRY_FILE = "bot_registry.json"
 PREMIUM_PRICE = 400
 OSINT_PRICE = 200
+LMNX_PRICE = 300  # Network/Crypto/Info tools premium
 LOG_PRICE = 600
 FREE_CHECK_LIMIT = 3000
 PREMIUM_CHECK_LIMIT = 999999
@@ -167,13 +168,17 @@ def db_init():
         is_banned INTEGER DEFAULT 0,
         ban_reason TEXT DEFAULT '',
         capture_used INTEGER DEFAULT 0,
-        log_used INTEGER DEFAULT 0
+        log_used INTEGER DEFAULT 0,
+        is_premium_lmnx INTEGER DEFAULT 0,
+        premium_lmnx_date TEXT DEFAULT ''
     )''')
     # Eski DB'ler için kolon ekle
     for col, typedef in [
         ("is_premium_log", "INTEGER DEFAULT 0"),
         ("premium_log_date", "TEXT DEFAULT ''"),
         ("log_used", "INTEGER DEFAULT 0"),
+        ("is_premium_lmnx", "INTEGER DEFAULT 0"),
+        ("premium_lmnx_date", "TEXT DEFAULT ''"),
     ]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
@@ -335,6 +340,41 @@ def is_premium_osint(user_id):
         return _as_int_flag(db_get(user_id, "is_premium_osint"))
     except:
         return False
+
+
+def is_premium_lmnx(user_id):
+    try:
+        return _as_int_flag(db_get(user_id, "is_premium_lmnx"))
+    except:
+        return False
+
+def set_premium_lmnx(user_id, username=""):
+    try:
+        add_user(user_id, username or "", "")
+        conn = sqlite3.connect(DB_PATH)
+        c = conn.cursor()
+        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        c.execute("UPDATE users SET is_premium_lmnx=1, premium_lmnx_date=? WHERE user_id=?", (now, user_id))
+        if c.rowcount == 0:
+            c.execute(
+                "INSERT INTO users (user_id,username,is_premium_lmnx,premium_lmnx_date,join_date) VALUES (?,?,1,?,?)",
+                (user_id, username or "", now, now)
+            )
+        c.execute(
+            "INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
+            (user_id, username or "", "LMNX", LMNX_PRICE, now)
+        )
+        conn.commit()
+        conn.close()
+        return True
+    except Exception as e:
+        print(f"[PREMIUM ERROR] set_premium_lmnx: {e}")
+        return False
+
+def remove_premium_lmnx(user_id):
+    add_user(user_id)
+    db_set(user_id, "is_premium_lmnx", 0)
+    db_set(user_id, "premium_lmnx_date", "")
 
 def is_premium_log(user_id):
     try:
@@ -2441,6 +2481,130 @@ LEAKSIGHTS_CATS = {
     "other":{"tr":"🔧 DİĞER","en":"🔧 OTHER","ar":"🔧 أخرى"},
 }
 
+
+# ══════════════════════════════════════════════════════════════
+#  LMNX TOOLS API (api.lmnx9.shop)
+#  AI = FREE | Digerleri = LMNX Premium (300⭐)
+# ══════════════════════════════════════════════════════════════
+LMNX_BASE = "https://api.lmnx9.shop"
+
+# key: (url_template, title, prompt, category, free_ai)
+# url_template uses {v} {v2} for params
+LMNX_APIS = {
+    # Network
+    "lmnx_sub":      ("https://api.lmnx9.shop/check-host/sub.php?host={v}", "Subdomain Scan", "Domain/host gir:", "net", False),
+    "lmnx_dns":      ("https://api.lmnx9.shop/check-host/dns.php?host={v}", "DNS Lookup", "Domain gir:", "net", False),
+    "lmnx_ping":     ("https://api.lmnx9.shop/check-host/ping.php?host={v}", "Ping", "Host/IP gir:", "net", False),
+    "lmnx_http":     ("https://api.lmnx9.shop/check-host/http.php?host={v}", "HTTP Check", "URL/host gir:", "net", False),
+    "lmnx_link":     ("https://api.lmnx9.shop/check-host/link.php?host={v}", "Link Check", "URL gir:", "net", False),
+    "lmnx_whois":    ("https://api.lmnx9.shop/tools/network.php?action=whois&domain={v}", "WHOIS", "Domain gir:", "net", False),
+    "lmnx_ssl":      ("https://api.lmnx9.shop/tools/network.php?action=ssl&domain={v}", "SSL Info", "Domain gir:", "net", False),
+    "lmnx_reverse":  ("https://api.lmnx9.shop/tools/network.php?action=reverse&ip={v}", "Reverse DNS", "IP gir:", "net", False),
+    "lmnx_port":     ("https://api.lmnx9.shop/tools/network.php?action=port&host={v}&port={v2}", "Port Scan", "Host ve port (ornek: 1.1.1.1 443):", "net", False),
+    # Crypto / Encode
+    "lmnx_b64e":     ("https://api.lmnx9.shop/tools/base64-enc.php?text={v}", "Base64 Encode", "Metin gir:", "crypto", False),
+    "lmnx_b64d":     ("https://api.lmnx9.shop/tools/base64-dec.php?text={v}", "Base64 Decode", "Base64 metin gir:", "crypto", False),
+    "lmnx_b85e":     ("https://api.lmnx9.shop/tools/base85-enc.php?text={v}", "Base85 Encode", "Metin gir:", "crypto", False),
+    "lmnx_b85d":     ("https://api.lmnx9.shop/tools/base85-dec.php?text={v}", "Base85 Decode", "Base85 metin gir:", "crypto", False),
+    "lmnx_hexe":     ("https://api.lmnx9.shop/tools/universal.php?action=hex_encode&text={v}", "Hex Encode", "Metin gir:", "crypto", False),
+    "lmnx_hexd":     ("https://api.lmnx9.shop/tools/universal.php?action=hex_decode&text={v}", "Hex Decode", "Hex gir:", "crypto", False),
+    "lmnx_urle":     ("https://api.lmnx9.shop/tools/universal.php?action=url_encode&text={v}", "URL Encode", "Metin gir:", "crypto", False),
+    "lmnx_urld":     ("https://api.lmnx9.shop/tools/universal.php?action=url_decode&text={v}", "URL Decode", "URL-encoded metin gir:", "crypto", False),
+    "lmnx_md5":      ("https://api.lmnx9.shop/tools/universal.php?action=md5&text={v}", "MD5 Hash", "Metin gir:", "crypto", False),
+    "lmnx_sha1":     ("https://api.lmnx9.shop/tools/universal.php?action=sha1&text={v}", "SHA1 Hash", "Metin gir:", "crypto", False),
+    "lmnx_sha256":   ("https://api.lmnx9.shop/tools/universal.php?action=sha256&text={v}", "SHA256 Hash", "Metin gir:", "crypto", False),
+    "lmnx_sha512":   ("https://api.lmnx9.shop/tools/universal.php?action=sha512&text={v}", "SHA512 Hash", "Metin gir:", "crypto", False),
+    "lmnx_crc32":    ("https://api.lmnx9.shop/tools/universal.php?action=crc32&text={v}", "CRC32", "Metin gir:", "crypto", False),
+    "lmnx_rot13":    ("https://api.lmnx9.shop/tools/universal.php?action=rot13&text={v}", "ROT13", "Metin gir:", "crypto", False),
+    "lmnx_rot47":    ("https://api.lmnx9.shop/tools/universal.php?action=rot47&text={v}", "ROT47", "Metin gir:", "crypto", False),
+    "lmnx_bine":     ("https://api.lmnx9.shop/tools/universal.php?action=binary_encode&text={v}", "Binary Encode", "Metin gir:", "crypto", False),
+    "lmnx_bind":     ("https://api.lmnx9.shop/tools/universal.php?action=binary_decode&text={v}", "Binary Decode", "Binary gir:", "crypto", False),
+    "lmnx_octe":     ("https://api.lmnx9.shop/tools/universal.php?action=octal_encode&text={v}", "Octal Encode", "Metin gir:", "crypto", False),
+    "lmnx_octd":     ("https://api.lmnx9.shop/tools/universal.php?action=octal_decode&text={v}", "Octal Decode", "Octal gir:", "crypto", False),
+    "lmnx_bcrypt":   ("https://api.lmnx9.shop/tools/bcrypt-hash-generate.php?text={v}", "Bcrypt Generate", "Metin gir:", "crypto", False),
+    "lmnx_bcryptv":  ("https://api.lmnx9.shop/tools/bcrypt-hash-verify.php?text={v}&hash={v2}", "Bcrypt Verify", "Metin ve hash (boslukla):", "crypto", False),
+    "lmnx_argon2":   ("https://api.lmnx9.shop/tools/universal.php?action=argon2&text={v}", "Argon2 Hash", "Metin gir:", "crypto", False),
+    "lmnx_argon2v":  ("https://api.lmnx9.shop/tools/universal.php?action=argon2_verify&text={v}&hash={v2}", "Argon2 Verify", "Metin ve hash (boslukla):", "crypto", False),
+    "lmnx_hmac":     ("https://api.lmnx9.shop/tools/universal.php?action=hmac&text={v}&key={v2}&algo=sha256", "HMAC SHA256", "Metin ve key (boslukla):", "crypto", False),
+    "lmnx_xor":      ("https://api.lmnx9.shop/tools/universal.php?action=xor&text={v}&key={v2}", "XOR Cipher", "Metin ve key (boslukla):", "crypto", False),
+    "lmnx_aescbc":   ("https://api.lmnx9.shop/tools/universal.php?action=aes_cbc_encrypt&text={v}&key={v2}", "AES-CBC Encrypt", "Metin ve key (boslukla):", "crypto", False),
+    "lmnx_aesgcm":   ("https://api.lmnx9.shop/tools/universal.php?action=aes_gcm_encrypt&text={v}&key={v2}", "AES-GCM Encrypt", "Metin ve key (boslukla):", "crypto", False),
+    "lmnx_hashid":   ("https://api.lmnx9.shop/tools/universal.php?action=hash_identify&hash={v}", "Hash Identify", "Hash gir:", "crypto", False),
+    # AI FREE
+    "lmnx_wormgpt":  ("https://api.lmnx9.shop/ai/wormgpt.php?prompt={v}", "WormGPT", "Prompt yaz:", "ai", True),
+    "lmnx_qwen":     ("https://api.lmnx9.shop/ai/qwen.php?prompt={v}", "Qwen AI", "Prompt yaz:", "ai", True),
+    "lmnx_deepseek": ("https://api.lmnx9.shop/ai/deepseek.php?prompt={v}", "DeepSeek", "Prompt yaz:", "ai", True),
+    "lmnx_claude":   ("https://api.lmnx9.shop/ai/claude.php?question={v}", "Claude AI", "Soru yaz:", "ai", True),
+    "lmnx_gemini":   ("https://api.lmnx9.shop/ai/gemini.php?prompt={v}", "Gemini AI", "Prompt yaz:", "ai", True),
+    "lmnx_gpt":      ("https://api.lmnx9.shop/ai?model=gpt&q={v}", "GPT", "Soru yaz:", "ai", True),
+    "lmnx_llama":    ("https://api.lmnx9.shop/ai?model=llama&q={v}", "Llama", "Soru yaz:", "ai", True),
+    "lmnx_grok":     ("https://api.lmnx9.shop/ai/?model=grok&q={v}", "Grok AI", "Soru yaz:", "ai", True),
+    "lmnx_ds2":      ("https://api.lmnx9.shop/ai?model=deepseek&q={v}", "DeepSeek Chat", "Soru yaz:", "ai", True),
+    "lmnx_darkai":   ("https://dark-ai.lmnx9.workers.dev?sukhi={v}", "Dark AI", "Prompt yaz:", "ai", True),
+    "lmnx_aiimg":    ("https://api.lmnx9.shop/ai/image.php?prompt={v}", "AI Image (LMNX)", "Image prompt (EN):", "ai", True),
+    "lmnx_aivid":    ("https://api.lmnx9.shop/ai/video.php?prompt={v}", "AI Video", "Video prompt:", "ai", True),
+    "lmnx_3dlogo":   ("https://3d-logo.lmnx9.workers.dev?prompt={v}", "3D Logo", "Logo prompt:", "ai", True),
+    "lmnx_tts":      ("https://api.lmnx9.shop/ai/tts.php?language=bn&text={v}", "TTS (BN)", "Ses metni gir:", "ai", True),
+    # Info / OSINT style
+    "lmnx_tgch":     ("https://api.lmnx9.shop/telegram/channel.php?username={v}", "TG Channel Info", "Kanal username (@siz):", "info", False),
+    "lmnx_tgotp":    ("https://api.lmnx9.shop/telegram/otp.php?number={v}", "TG OTP Check", "Telefon no gir:", "info", False),
+    "lmnx_twitter":  ("https://api.lmnx9.shop/info/twitter.php?url={v}", "Twitter Info", "Tweet/profil URL:", "info", False),
+    "lmnx_truecaller":("https://api.lmnx9.shop/info/truecaller.php?number={v}", "Truecaller", "Telefon (+90...):", "info", False),
+    "lmnx_tiktok":   ("https://api.lmnx9.shop/info/tiktok.php?limit=10&username={v}", "TikTok Info", "TikTok username:", "info", False),
+    "lmnx_bin":      ("https://api.lmnx9.shop/bin-lookup.php?bin={v}", "BIN Lookup", "BIN (6-8 hane):", "info", False),
+    "lmnx_imei":     ("https://api.lmnx9.shop/imei/info.php?imei={v}", "IMEI Info", "IMEI gir:", "info", False),
+    "lmnx_ffinfo":   ("https://api.lmnx9.shop/ff/info.php?uid={v}", "FF Info", "Free Fire UID:", "info", False),
+    "lmnx_ffban":    ("https://api.lmnx9.shop/ff/ban.php?uid={v}", "FF Ban Check", "Free Fire UID:", "info", False),
+    "lmnx_darkweb":  ("https://api.lmnx9.shop/search/darkweb.php?search={v}", "Darkweb Search", "Arama terimi:", "info", False),
+    "lmnx_deep":     ("https://api.lmnx9.shop/search/deep.php?query={v}", "Deep Search", "Arama sorgusu:", "info", False),
+    # Tempmail
+    "lmnx_mailc":    ("https://api.lmnx9.shop/tempmail/create.php", "TempMail Create", None, "mail", False),
+    "lmnx_mailk":    ("https://api.lmnx9.shop/tempmail/check.php?token={v}", "TempMail Check", "Token gir:", "mail", False),
+}
+
+LMNX_CATS = {
+    "net":    ("🌐 Network / Host", ["lmnx_sub","lmnx_dns","lmnx_ping","lmnx_http","lmnx_link","lmnx_whois","lmnx_ssl","lmnx_reverse","lmnx_port"]),
+    "crypto": ("🔐 Encode / Crypto", ["lmnx_b64e","lmnx_b64d","lmnx_b85e","lmnx_b85d","lmnx_hexe","lmnx_hexd","lmnx_urle","lmnx_urld","lmnx_md5","lmnx_sha1","lmnx_sha256","lmnx_sha512","lmnx_crc32","lmnx_rot13","lmnx_rot47","lmnx_bine","lmnx_bind","lmnx_octe","lmnx_octd","lmnx_bcrypt","lmnx_bcryptv","lmnx_argon2","lmnx_argon2v","lmnx_hmac","lmnx_xor","lmnx_aescbc","lmnx_aesgcm","lmnx_hashid"]),
+    "ai":     ("🤖 AI (Free)", ["lmnx_wormgpt","lmnx_qwen","lmnx_deepseek","lmnx_claude","lmnx_gemini","lmnx_gpt","lmnx_llama","lmnx_grok","lmnx_ds2","lmnx_darkai","lmnx_aiimg","lmnx_aivid","lmnx_3dlogo","lmnx_tts"]),
+    "info":   ("📱 Info / Lookup", ["lmnx_tgch","lmnx_tgotp","lmnx_twitter","lmnx_truecaller","lmnx_tiktok","lmnx_bin","lmnx_imei","lmnx_ffinfo","lmnx_ffban","lmnx_darkweb","lmnx_deep"]),
+    "mail":   ("📧 Temp Mail", ["lmnx_mailc","lmnx_mailk"]),
+}
+
+def lmnx_can_use(user_id, key):
+    """AI free; digerleri LMNX premium veya admin."""
+    info = LMNX_APIS.get(key)
+    if not info:
+        return False
+    if info[4]:  # free_ai
+        return True
+    if user_id == ADMIN_ID or is_premium_lmnx(user_id):
+        return True
+    return False
+
+def lmnx_main_kb(user_id):
+    mk = InlineKeyboardMarkup(row_width=1)
+    if user_id == ADMIN_ID or is_premium_lmnx(user_id):
+        mk.add(_btn("⭐ LMNX Premium Aktif", "noop"))
+    else:
+        mk.add(_btn(f"⭐ LMNX Premium Al ({LMNX_PRICE}⭐)", "buy_lmnx"))
+        mk.add(_btn("🤖 AI araclar ucretsiz", "noop"))
+    for cat, (title, keys) in LMNX_CATS.items():
+        free_tag = " 🆓" if cat == "ai" else ""
+        mk.add(_btn(f"{title}{free_tag}", f"lmnx_cat_{cat}"))
+    mk.add(_btn("◀️ Geri", "goto_tools"))
+    return mk
+
+def lmnx_cat_kb(user_id, cat):
+    mk = InlineKeyboardMarkup(row_width=1)
+    title, keys = LMNX_CATS.get(cat, ("", []))
+    for k in keys:
+        url, name, prompt, c, free = LMNX_APIS[k]
+        tag = " 🆓" if free else ""
+        mk.add(_btn(f"{name}{tag}", f"lmnx_tool_{k}"))
+    mk.add(_btn("◀️ Geri", "menu_lmnx"))
+    return mk
+
+
 TOOLS_API = {
     "bedrock":"https://wazelyapi.vercel.app/api/bedrock?adres=",
     "ccgen":"https://wazelyapi.vercel.app/api/ccgen?bin=",
@@ -2533,8 +2697,8 @@ TURKEY_PROMPTS = {
 
 def tools_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
-    ls_txt = "🌍 LeakSights OSINT ⭐" if is_premium_osint(user_id) else "🌍 LeakSights OSINT 🔒"
-    mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn(ls_txt, "menu_ls"))
+    lmnx_txt = "🛠 LMNX Tools ⭐" if (user_id == ADMIN_ID or is_premium_lmnx(user_id)) else "🛠 LMNX Tools 🔒"
+    mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn(lmnx_txt, "menu_lmnx"))
     mk.add(
         _btn("🎮 MC Bedrock", "tool_bedrock"), _btn("💳 CC Generator", "tool_ccgen"),
         _btn("🤖 Discord Token", "tool_dctoken"), _btn("✈️ TG Token", "tool_tgtoken"),
@@ -4797,6 +4961,7 @@ def register_handlers(bot_instance):
             _btn("📋 TG-ID Logları","adm_tgid_logs"),
             _btn("💰 TG-ID Satın Almalar","adm_tgid_purchases"),
             _btn("📂 LOG Premium Ver","adm_log_give"),
+            _btn("🛠 LMNX Premium Ver","adm_lmnx_give"),
             _btn("🎨 AI Image Bakiye Ver","adm_aiimg_give"),
             _btn("➖ AI Image Bakiye Al","adm_aiimg_take"),
             _btn("➖ TG-ID Bakiye Al","adm_tgid_take"),
@@ -4877,6 +5042,10 @@ def register_handlers(bot_instance):
             if action == "adm_give_premium":
                 USER_STATES.pop(uid, None)
                 _admin_premium_select_user(msg, bot_instance)
+                return
+            if action == "adm_lmnx_give":
+                USER_STATES.pop(uid, None)
+                _admin_lmnx_give_user(msg, bot_instance)
                 return
             if action == "adm_log_give":
                 USER_STATES.pop(uid, None)
@@ -5094,22 +5263,95 @@ def register_handlers(bot_instance):
                 try: bot_instance.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=turkey_kb(uid))
                 except: bot_instance.send_message(call.message.chat.id, "🇹🇷", reply_markup=turkey_kb(uid))
                 return
-            if data == "menu_ls":
-                if not is_premium_osint(uid):
+            if data == "menu_lmnx":
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                txt = (
+                    "🛠 <b>LMNX TOOLS</b>\n━━━━━━━━━━━━━━━━━━━━━\n"
+                    "🤖 AI araçları: <b>ÜCRETSİZ</b>\n"
+                    f"🌐 Network / Crypto / Info: <b>Premium {LMNX_PRICE}⭐</b>\n\n"
+                    "Kategori seç:"
+                )
+                try:
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
+                                                   reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
+                except:
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
+                return
+            if data.startswith("lmnx_cat_"):
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                cat = data.replace("lmnx_cat_", "", 1)
+                if cat not in LMNX_CATS:
+                    return
+                title, keys = LMNX_CATS[cat]
+                try:
+                    bot_instance.edit_message_text(
+                        f"{title}\nAraç seç:",
+                        call.message.chat.id, call.message.message_id,
+                        reply_markup=lmnx_cat_kb(uid, cat), parse_mode="HTML")
+                except:
+                    bot_instance.send_message(call.message.chat.id, f"{title}", reply_markup=lmnx_cat_kb(uid, cat))
+                return
+            if data.startswith("lmnx_tool_"):
+                key = data.replace("lmnx_tool_", "", 1)
+                if key not in LMNX_APIS:
+                    try: bot_instance.answer_callback_query(call.id, "Gecersiz", show_alert=True)
+                    except: pass
+                    return
+                url_t, name, prompt, cat, free = LMNX_APIS[key]
+                if not lmnx_can_use(uid, key):
+                    try: bot_instance.answer_callback_query(call.id, f"⭐ LMNX Premium gerekli ({LMNX_PRICE}⭐)", show_alert=True)
+                    except: pass
                     mk = InlineKeyboardMarkup()
-                    mk.add(_btn("🌍 OSINT Premium Satın Al (200⭐)", "buy_osint"))
-                    mk.add(_btn(s(uid, "back_btn"), "goto_tools"))
-                    txt = ("🔒 <b>LeakSights OSINT — Premium</b>\n💰 Fiyat: 200 Yıldız\n"
-                           "♾️ Süre: Sınırsız (Ömür Boyu)\n🔍 30+ OSINT Sorgu")
-                    try: bot_instance.answer_callback_query(call.id)
+                    mk.add(_btn(f"⭐ Premium Al ({LMNX_PRICE}⭐)", "buy_lmnx"))
+                    mk.add(_btn("◀️ Geri", "menu_lmnx"))
+                    bot_instance.send_message(call.message.chat.id,
+                        f"🔒 <b>{name}</b> Premium gerektirir.\n💰 Fiyat: {LMNX_PRICE}⭐",
+                        reply_markup=mk, parse_mode="HTML")
+                    return
+                try: bot_instance.answer_callback_query(call.id)
+                except: pass
+                # Tempmail create: no input
+                if key == "lmnx_mailc" or prompt is None:
+                    sm = bot_instance.send_message(call.message.chat.id, f"⏳ <b>{name}</b>...", parse_mode="HTML")
+                    _process_lmnx(call.message, key, "", bot_instance, sm)
+                    return
+                m = bot_instance.send_message(call.message.chat.id,
+                    f"🛠 <b>{name}</b>\n{prompt}\n<i>Iptal: iptal</i>", parse_mode="HTML")
+                bot_instance.register_next_step_handler(m, lambda m, k=key: _process_lmnx_step(m, k, bot_instance))
+                return
+            if data == "buy_lmnx":
+                if is_premium_lmnx(uid):
+                    try: bot_instance.answer_callback_query(call.id, "Zaten LMNX Premium!", show_alert=True)
                     except: pass
-                    try: bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=mk)
-                    except: bot_instance.send_message(call.message.chat.id, txt, reply_markup=mk)
-                else:
-                    try: bot_instance.answer_callback_query(call.id)
-                    except: pass
-                    try: bot_instance.edit_message_reply_markup(call.message.chat.id, call.message.message_id, reply_markup=ls_kb(uid))
-                    except: bot_instance.send_message(call.message.chat.id, "🌍 LeakSights", reply_markup=ls_kb(uid))
+                    return
+                prices = [LabeledPrice(label="🛠 LMNX Tools Premium", amount=LMNX_PRICE)]
+                try:
+                    bot_instance.send_invoice(
+                        chat_id=call.message.chat.id,
+                        title="🛠 LMNX Tools Premium",
+                        description="Network, Crypto, Info, TempMail — omur boyu",
+                        invoice_payload="lmnx",
+                        provider_token="",
+                        currency="XTR",
+                        prices=prices,
+                    )
+                    bot_instance.answer_callback_query(call.id, "Fatura gonderildi")
+                except Exception as e:
+                    bot_instance.answer_callback_query(call.id, f"Hata: {e}", show_alert=True)
+                return
+            if data == "menu_ls":
+                # LeakSights kaldirildi -> LMNX
+                try: bot_instance.answer_callback_query(call.id, "LeakSights kaldirildi")
+                except: pass
+                data = "menu_lmnx"
+                txt = "🛠 <b>LMNX TOOLS</b> (LeakSights yerine)"
+                try:
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id,
+                                                   reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
+                except:
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
                 return
             if data == "buy_premium":
                 if is_premium(uid):
@@ -5770,7 +6012,13 @@ def register_handlers(bot_instance):
             set_premium(uid, username)
             bot_instance.reply_to(msg, "🎉 **Hotmail Premium aktif!**\n📧 Sınırsız Hotmail + 📸 Sınırsız Capture + 🔖 Sınırsız Keyword + 🆔 Sınırsız TG-ID erişimi kazandın.")
             bot_instance.send_message(ADMIN_ID, f"📧 <b>YENİ HOTMAIL PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {PREMIUM_PRICE} Stars")
+        if payload == "lmnx":
+            set_premium_lmnx(uid, username)
+            bot_instance.reply_to(msg, f"🎉 <b>LMNX Tools Premium aktif!</b>\n🛠 Network · Crypto · Info · TempMail\n💰 {LMNX_PRICE}⭐", parse_mode="HTML")
+            try: bot_instance.send_message(ADMIN_ID, f"🛠 <b>YENİ LMNX PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {LMNX_PRICE} Stars")
+            except: pass
         elif payload == "osint":
+
             set_premium_osint(uid, username)
             bot_instance.reply_to(msg, "🌍 **OSINT Premium aktif!**\n🔍 LeakSights OSINT (30+ Sorgu) erişimi kazandın.")
             bot_instance.send_message(ADMIN_ID, f"🌍 <b>YENİ OSINT PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {OSINT_PRICE} Stars")
@@ -6178,6 +6426,125 @@ def _combo_engine(domain, limit=None):
     if limit: uniq = uniq[:limit]
     return uniq, None, " + ".join(apis)
 
+
+def _process_lmnx_step(msg, key, bot_instance):
+    uid = msg.from_user.id
+    if enforce_ban(uid):
+        bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
+        return
+    text = (msg.text or "").strip()
+    if text.lower() in ("iptal", "cancel", "q"):
+        bot_instance.reply_to(msg, "Iptal edildi.")
+        return
+    if not lmnx_can_use(uid, key):
+        bot_instance.reply_to(msg, f"⭐ LMNX Premium gerekli ({LMNX_PRICE}⭐)")
+        return
+    sm = bot_instance.reply_to(msg, "⏳ Sorgulanıyor...")
+    _process_lmnx(msg, key, text, bot_instance, sm)
+
+
+def _process_lmnx(msg, key, text, bot_instance, sm=None):
+    uid = msg.from_user.id if hasattr(msg, "from_user") else 0
+    info = LMNX_APIS.get(key)
+    if not info:
+        return
+    url_t, name, prompt, cat, free = info
+    v = text.strip()
+    v2 = ""
+    # iki parametreli araclar
+    if key in ("lmnx_port", "lmnx_bcryptv", "lmnx_argon2v", "lmnx_hmac", "lmnx_xor", "lmnx_aescbc", "lmnx_aesgcm"):
+        parts = v.split(None, 1)
+        if len(parts) < 2 and key != "lmnx_mailc":
+            try:
+                bot_instance.edit_message_text(
+                    "❌ Iki deger gerekli (boslukla ayir).",
+                    msg.chat.id, sm.message_id if sm else msg.message_id)
+            except Exception:
+                bot_instance.send_message(msg.chat.id, "❌ Iki deger gerekli.")
+            return
+        if len(parts) >= 2:
+            v, v2 = parts[0], parts[1]
+        else:
+            v, v2 = parts[0], ""
+    try:
+        if "{v}" in url_t:
+            url = url_t.replace("{v}", quote(v, safe="")).replace("{v2}", quote(v2, safe=""))
+        else:
+            url = url_t
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=45, verify=False)
+        body = r.text or ""
+        try:
+            data = r.json()
+            out = json.dumps(data, indent=2, ensure_ascii=False)
+        except Exception:
+            out = body[:3500]
+        if len(out) > 3500:
+            out = out[:3500] + "\n... (kisaltildi)"
+        txt = (
+            f"🛠 <b>{name}</b>\n"
+            f"━━━━━━━━━━━━━━━━━━━━━\n"
+            f"<code>{html.escape(out)}</code>"
+        )
+        # AI image/video: URL iceriyorsa gonder
+        if key in ("lmnx_aiimg", "lmnx_aivid", "lmnx_3dlogo") and ("http" in out.lower()):
+            try:
+                j = json.loads(body) if body.strip().startswith("{") else None
+            except Exception:
+                j = None
+            img_url = None
+            if isinstance(j, dict):
+                for k in ("url", "image", "image_url", "result", "output"):
+                    if isinstance(j.get(k), str) and j[k].startswith("http"):
+                        img_url = j[k]
+                        break
+            if img_url:
+                try:
+                    bot_instance.send_photo(msg.chat.id, img_url, caption=f"🛠 {name}")
+                    if sm:
+                        try: bot_instance.delete_message(msg.chat.id, sm.message_id)
+                        except: pass
+                    return
+                except Exception:
+                    pass
+        if sm:
+            try:
+                bot_instance.edit_message_text(txt, msg.chat.id, sm.message_id, parse_mode="HTML")
+            except Exception:
+                bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+        else:
+            bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+    except Exception as e:
+        err = f"❌ Hata: <code>{html.escape(str(e))}</code>"
+        try:
+            if sm:
+                bot_instance.edit_message_text(err, msg.chat.id, sm.message_id, parse_mode="HTML")
+            else:
+                bot_instance.send_message(msg.chat.id, err, parse_mode="HTML")
+        except Exception:
+            pass
+
+
+def _admin_lmnx_give_user(msg, bot_instance):
+    if msg.from_user.id != ADMIN_ID:
+        return
+    tid, tuname = _resolve_target(msg.text.strip())
+    if not tid:
+        bot_instance.reply_to(msg, "❌ Kullanici bulunamadi!")
+        return
+    add_user(tid, tuname or "", "")
+    if is_premium_lmnx(tid):
+        bot_instance.reply_to(msg, f"ℹ️ @{tuname or tid} zaten LMNX Premium!")
+        return
+    if set_premium_lmnx(tid, tuname or str(tid)):
+        bot_instance.reply_to(msg, f"✅ LMNX Premium verildi!\n👤 @{tuname or tid}\n🆔 <code>{tid}</code>", parse_mode="HTML")
+        try:
+            bot_instance.send_message(tid, f"🎁 Admin sana <b>LMNX Tools Premium</b> verdi!\n🛠 Network · Crypto · Info aktif.", parse_mode="HTML")
+        except Exception:
+            pass
+    else:
+        bot_instance.reply_to(msg, "❌ Verilemedi.")
+
+
 def _process_turkey(msg, tool, bot_instance):
     uid = msg.from_user.id
     param = msg.text.strip()
@@ -6539,7 +6906,14 @@ def _handle_admin_cb(call, action, bot_instance):
             except Exception:
                 bot_instance.answer_callback_query(call.id, "Hatalı ID", show_alert=True); return
             _admin_give_premium_log(call, tid, str(tid), bot_instance); return
+        elif action == "lmnx_give":
+            try: bot_instance.answer_callback_query(call.id)
+            except: pass
+            USER_STATES[uid] = {"action": "adm_lmnx_give"}
+            bot_instance.send_message(cid, "🛠 <b>LMNX Premium Ver</b>\nTelegram ID gir:\n<code>123456789</code>", parse_mode="HTML")
+            return
         elif action == "log_give":
+
             try: bot_instance.answer_callback_query(call.id)
             except: pass
             USER_STATES[uid] = {"action": "adm_log_give"}
@@ -6710,6 +7084,7 @@ def _admin_remove(msg, bot_instance):
     if is_premium(tid): remove_premium(tid); removed.append("Hotmail")
     if is_premium_osint(tid): remove_premium_osint(tid); removed.append("OSINT")
     if is_premium_log(tid): remove_premium_log(tid); removed.append("LOG")
+    if is_premium_lmnx(tid): remove_premium_lmnx(tid); removed.append("LMNX")
     if removed: bot_instance.reply_to(msg, f"✅ @{tuname or tid} {', '.join(removed)} Premium kaldırıldı!")
     else: bot_instance.reply_to(msg, f"ℹ️ @{tuname or tid} zaten Premium değil!")
 
