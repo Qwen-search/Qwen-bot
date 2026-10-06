@@ -55,6 +55,10 @@ BOT_REGISTRY_FILE = "bot_registry.json"
 PREMIUM_PRICE = 400
 OSINT_PRICE = 200
 LMNX_PRICE = 300  # Network/Crypto/Info tools premium
+# ── Free AI (Hacker GPT / 3D Logo / Video) ──
+HACKER_GPT_URL = "https://dark-ai.lmnx9.workers.dev/?sukhi="
+AI_3D_LOGO_URL = "https://3d-logo.lmnx9.workers.dev/?prompt="
+AI_VIDEO_URL   = "https://api.lmnx9.shop/ai/video.php?prompt="
 LOG_PRICE = 600
 FREE_CHECK_LIMIT = 3000
 PREMIUM_CHECK_LIMIT = 999999
@@ -2484,12 +2488,11 @@ LEAKSIGHTS_CATS = {
 
 # ══════════════════════════════════════════════════════════════
 #  LMNX TOOLS API (api.lmnx9.shop)
-#  AI = FREE | Digerleri = LMNX Premium (300⭐)
+#  Tum araclar LMNX Premium (300⭐) | AI kaldirildi
 # ══════════════════════════════════════════════════════════════
 LMNX_BASE = "https://api.lmnx9.shop"
 
 # key: (url_template, title, prompt, category, free_ai)
-# url_template uses {v} {v2} for params
 LMNX_APIS = {
     # Network
     "lmnx_sub":      ("https://api.lmnx9.shop/check-host/sub.php?host={v}", "Subdomain Scan", "Domain/host gir:", "net", False),
@@ -2530,22 +2533,7 @@ LMNX_APIS = {
     "lmnx_aescbc":   ("https://api.lmnx9.shop/tools/universal.php?action=aes_cbc_encrypt&text={v}&key={v2}", "AES-CBC Encrypt", "Metin ve key (boslukla):", "crypto", False),
     "lmnx_aesgcm":   ("https://api.lmnx9.shop/tools/universal.php?action=aes_gcm_encrypt&text={v}&key={v2}", "AES-GCM Encrypt", "Metin ve key (boslukla):", "crypto", False),
     "lmnx_hashid":   ("https://api.lmnx9.shop/tools/universal.php?action=hash_identify&hash={v}", "Hash Identify", "Hash gir:", "crypto", False),
-    # AI FREE
-    "lmnx_wormgpt":  ("https://api.lmnx9.shop/ai/wormgpt.php?prompt={v}", "WormGPT", "Prompt yaz:", "ai", True),
-    "lmnx_qwen":     ("https://api.lmnx9.shop/ai/qwen.php?prompt={v}", "Qwen AI", "Prompt yaz:", "ai", True),
-    "lmnx_deepseek": ("https://api.lmnx9.shop/ai/deepseek.php?prompt={v}", "DeepSeek", "Prompt yaz:", "ai", True),
-    "lmnx_claude":   ("https://api.lmnx9.shop/ai/claude.php?question={v}", "Claude AI", "Soru yaz:", "ai", True),
-    "lmnx_gemini":   ("https://api.lmnx9.shop/ai/gemini.php?prompt={v}", "Gemini AI", "Prompt yaz:", "ai", True),
-    "lmnx_gpt":      ("https://api.lmnx9.shop/ai?model=gpt&q={v}", "GPT", "Soru yaz:", "ai", True),
-    "lmnx_llama":    ("https://api.lmnx9.shop/ai?model=llama&q={v}", "Llama", "Soru yaz:", "ai", True),
-    "lmnx_grok":     ("https://api.lmnx9.shop/ai/?model=grok&q={v}", "Grok AI", "Soru yaz:", "ai", True),
-    "lmnx_ds2":      ("https://api.lmnx9.shop/ai?model=deepseek&q={v}", "DeepSeek Chat", "Soru yaz:", "ai", True),
-    "lmnx_darkai":   ("https://dark-ai.lmnx9.workers.dev?sukhi={v}", "Dark AI", "Prompt yaz:", "ai", True),
-    "lmnx_aiimg":    ("https://api.lmnx9.shop/ai/image.php?prompt={v}", "AI Image (LMNX)", "Image prompt (EN):", "ai", True),
-    "lmnx_aivid":    ("https://api.lmnx9.shop/ai/video.php?prompt={v}", "AI Video", "Video prompt:", "ai", True),
-    "lmnx_3dlogo":   ("https://3d-logo.lmnx9.workers.dev?prompt={v}", "3D Logo", "Logo prompt:", "ai", True),
-    "lmnx_tts":      ("https://api.lmnx9.shop/ai/tts.php?language=bn&text={v}", "TTS (BN)", "Ses metni gir:", "ai", True),
-    # Info / OSINT style
+    # Info / Lookup
     "lmnx_tgch":     ("https://api.lmnx9.shop/telegram/channel.php?username={v}", "TG Channel Info", "Kanal username (@siz):", "info", False),
     "lmnx_tgotp":    ("https://api.lmnx9.shop/telegram/otp.php?number={v}", "TG OTP Check", "Telefon no gir:", "info", False),
     "lmnx_twitter":  ("https://api.lmnx9.shop/info/twitter.php?url={v}", "Twitter Info", "Tweet/profil URL:", "info", False),
@@ -2565,21 +2553,132 @@ LMNX_APIS = {
 LMNX_CATS = {
     "net":    ("🌐 Network / Host", ["lmnx_sub","lmnx_dns","lmnx_ping","lmnx_http","lmnx_link","lmnx_whois","lmnx_ssl","lmnx_reverse","lmnx_port"]),
     "crypto": ("🔐 Encode / Crypto", ["lmnx_b64e","lmnx_b64d","lmnx_b85e","lmnx_b85d","lmnx_hexe","lmnx_hexd","lmnx_urle","lmnx_urld","lmnx_md5","lmnx_sha1","lmnx_sha256","lmnx_sha512","lmnx_crc32","lmnx_rot13","lmnx_rot47","lmnx_bine","lmnx_bind","lmnx_octe","lmnx_octd","lmnx_bcrypt","lmnx_bcryptv","lmnx_argon2","lmnx_argon2v","lmnx_hmac","lmnx_xor","lmnx_aescbc","lmnx_aesgcm","lmnx_hashid"]),
-    "ai":     ("🤖 AI (Free)", ["lmnx_wormgpt","lmnx_qwen","lmnx_deepseek","lmnx_claude","lmnx_gemini","lmnx_gpt","lmnx_llama","lmnx_grok","lmnx_ds2","lmnx_darkai","lmnx_aiimg","lmnx_aivid","lmnx_3dlogo","lmnx_tts"]),
     "info":   ("📱 Info / Lookup", ["lmnx_tgch","lmnx_tgotp","lmnx_twitter","lmnx_truecaller","lmnx_tiktok","lmnx_bin","lmnx_imei","lmnx_ffinfo","lmnx_ffban","lmnx_darkweb","lmnx_deep"]),
     "mail":   ("📧 Temp Mail", ["lmnx_mailc","lmnx_mailk"]),
 }
 
+# API reklam / branding gizleme
+_LMNX_HIDE_KEYS = {
+    "developer", "dev", "author", "telegram", "tg", "website", "site",
+    "channel", "credit", "credits", "owner", "by", "powered_by", "poweredby",
+    "api_by", "source", "copyright", "brand", "branding",
+}
+_LMNX_REPLACEMENTS = [
+    ("DARK LMNx9", "hackledin"),
+    ("DARK LMNX9", "hackledin"),
+    ("Dark LMNx9", "hackledin"),
+    ("@x_LMNx9", "@hackledin"),
+    ("@x_lmnx9", "@hackledin"),
+    ("lmnx9.shop", "hackledin"),
+    ("api.lmnx9.shop", "hackledin"),
+    ("LMNx9", "hackledin"),
+    ("LMNX9", "hackledin"),
+    ("lmnx9", "hackledin"),
+]
+
+
+def _lmnx_sanitize(obj):
+    """API reklam alanlarini kaldir / degistir."""
+    if isinstance(obj, dict):
+        out = {}
+        for k, v in obj.items():
+            kl = str(k).lower().strip()
+            if kl in _LMNX_HIDE_KEYS:
+                continue
+            if kl in ("developer", "author") or "developer" in kl:
+                out[k] = "hackledin"
+                continue
+            if kl in ("telegram", "tg") and isinstance(v, str) and "lmnx" in v.lower():
+                out[k] = "@hackledin"
+                continue
+            if kl in ("website", "site", "url") and isinstance(v, str) and "lmnx" in v.lower():
+                continue
+            out[k] = _lmnx_sanitize(v)
+        return out
+    if isinstance(obj, list):
+        return [_lmnx_sanitize(x) for x in obj]
+    if isinstance(obj, str):
+        s = obj
+        for a, b in _LMNX_REPLACEMENTS:
+            s = s.replace(a, b)
+        return s
+    return obj
+
+
+def _lmnx_emoji_for_key(k):
+    kl = str(k).lower()
+    mapping = {
+        "host": "🌐", "domain": "🌐", "ip": "📡", "port": "🔌", "status": "📊",
+        "dns": "🧭", "ping": "📶", "ssl": "🔒", "http": "🌍", "url": "🔗",
+        "result": "✅", "data": "📦", "info": "ℹ️", "message": "💬", "error": "❌",
+        "success": "✅", "hash": "🔑", "text": "📝", "encode": "🔐", "decode": "🔓",
+        "username": "👤", "number": "📞", "phone": "📱", "email": "📧", "token": "🎫",
+        "bin": "💳", "imei": "📱", "uid": "🎮", "title": "📌", "name": "📛",
+        "country": "🏳️", "city": "🏙️", "bank": "🏦", "brand": "🏷️",
+        "query": "🔍", "search": "🔎", "time": "⏱️", "date": "📅",
+    }
+    for part, em in mapping.items():
+        if part in kl:
+            return em
+    return "•"
+
+
+def _lmnx_format_text(name, queried, data):
+    """Emojili duzenli txt cikti."""
+    now = datetime.now().strftime("%d.%m.%Y %H:%M:%S")
+    lines = []
+    lines.append("=" * 44)
+    lines.append(f"  🛠  {name}")
+    lines.append("=" * 44)
+    if queried:
+        lines.append(f"  🎯 Aranan : {queried}")
+    lines.append(f"  📅 Tarih  : {now}")
+    lines.append(f"  👨‍💻 Developer: hackledin")
+    lines.append("=" * 44)
+    lines.append("")
+
+    def dump(obj, indent=0):
+        pad = "  " * indent
+        if isinstance(obj, dict):
+            for k, v in obj.items():
+                if v is None or (isinstance(v, str) and not v.strip()):
+                    continue
+                em = _lmnx_emoji_for_key(k)
+                if isinstance(v, (dict, list)):
+                    lines.append(f"{pad}{em} {k}:")
+                    dump(v, indent + 1)
+                else:
+                    lines.append(f"{pad}{em} {k}: {v}")
+        elif isinstance(obj, list):
+            for i, item in enumerate(obj, 1):
+                lines.append(f"{pad}📌 Kayit {i}")
+                dump(item, indent + 1)
+                if i < len(obj):
+                    lines.append("")
+        else:
+            if str(obj).strip():
+                lines.append(f"{pad}{obj}")
+
+    if data is None:
+        lines.append("  ❌ Sonuc yok.")
+    else:
+        dump(data)
+
+    lines.append("")
+    lines.append("=" * 44)
+    lines.append("  🤖 Cyber Search | @hackledin")
+    lines.append("=" * 44)
+    return "\n".join(lines)
+
+
 def lmnx_can_use(user_id, key):
-    """AI free; digerleri LMNX premium veya admin."""
-    info = LMNX_APIS.get(key)
-    if not info:
+    """Tum LMNX araclar premium (veya admin)."""
+    if key not in LMNX_APIS:
         return False
-    if info[4]:  # free_ai
-        return True
     if user_id == ADMIN_ID or is_premium_lmnx(user_id):
         return True
     return False
+
 
 def lmnx_main_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=1)
@@ -2587,22 +2686,21 @@ def lmnx_main_kb(user_id):
         mk.add(_btn("⭐ LMNX Premium Aktif", "noop"))
     else:
         mk.add(_btn(f"⭐ LMNX Premium Al ({LMNX_PRICE}⭐)", "buy_lmnx"))
-        mk.add(_btn("🤖 AI araclar ucretsiz", "noop"))
     for cat, (title, keys) in LMNX_CATS.items():
-        free_tag = " 🆓" if cat == "ai" else ""
-        mk.add(_btn(f"{title}{free_tag}", f"lmnx_cat_{cat}"))
+        mk.add(_btn(title, f"lmnx_cat_{cat}"))
     mk.add(_btn("◀️ Geri", "goto_tools"))
     return mk
+
 
 def lmnx_cat_kb(user_id, cat):
     mk = InlineKeyboardMarkup(row_width=1)
     title, keys = LMNX_CATS.get(cat, ("", []))
     for k in keys:
         url, name, prompt, c, free = LMNX_APIS[k]
-        tag = " 🆓" if free else ""
-        mk.add(_btn(f"{name}{tag}", f"lmnx_tool_{k}"))
+        mk.add(_btn(name, f"lmnx_tool_{k}"))
     mk.add(_btn("◀️ Geri", "menu_lmnx"))
     return mk
+
 
 
 TOOLS_API = {
@@ -2703,6 +2801,8 @@ def tools_kb(user_id):
     else:
         lmnx_txt = "LMNX Tools (Bakimda)"
     mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn(lmnx_txt, "menu_lmnx"))
+    mk.add(_btn("💀 Hacker GPT", "tool_hackergpt"), _btn("🎨 3D Logo", "tool_3dlogo"))
+    mk.add(_btn("🎬 AI Video", "tool_aivideo"))
     mk.add(
         _btn("🎮 MC Bedrock", "tool_bedrock"), _btn("💳 CC Generator", "tool_ccgen"),
         _btn("🤖 Discord Token", "tool_dctoken"), _btn("✈️ TG Token", "tool_tgtoken"),
@@ -5295,8 +5395,8 @@ def register_handlers(bot_instance):
                 txt = (
                     "<b>LMNX TOOLS</b> (Admin)\n"
                     "━━━━━━━━━━━━━━━━━━━━━\n"
-                    "AI araclar: ucretsiz\n"
-                    f"Network / Crypto / Info: Premium {LMNX_PRICE} yildiz\n\n"
+                    "Network · Crypto · Info · TempMail\n"
+                    f"Premium: {LMNX_PRICE} yildiz\n\n"
                     "Kategori sec:"
                 )
                 try:
@@ -5650,6 +5750,71 @@ def register_handlers(bot_instance):
                     bot_instance.answer_callback_query(call.id, f"❌ {e}", show_alert=True)
                 return
 
+
+            if data == "tool_hackergpt":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                USER_STATES[uid] = {"action": "hackergpt_chat"}
+                m = bot_instance.send_message(
+                    call.message.chat.id,
+                    "💀 <b>Hacker GPT</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Ne istersen yaz — kod, fikir, script...\n"
+                    "Sohbet gibi devam eder.\n"
+                    "<i>Bitirmek icin: bitir / iptal</i>",
+                    parse_mode="HTML",
+                )
+                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                return
+            if data == "hackergpt_continue":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                USER_STATES[uid] = {"action": "hackergpt_chat"}
+                m = bot_instance.send_message(call.message.chat.id, "💬 Devam et, yaz:")
+                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                return
+            if data == "hackergpt_end":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                USER_STATES.pop(uid, None)
+                bot_instance.send_message(call.message.chat.id, "Sohbet kapandi.")
+                return
+            if data == "tool_3dlogo":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                m = bot_instance.send_message(
+                    call.message.chat.id,
+                    "🎨 <b>3D Logo</b>\n"
+                    "Logo promptunu yaz (Ingilizce daha iyi):\n"
+                    "<code>cyber skull logo, neon green, dark background</code>\n"
+                    "<i>Iptal: iptal</i>",
+                    parse_mode="HTML",
+                )
+                bot_instance.register_next_step_handler(m, lambda m: _process_3dlogo(m, bot_instance))
+                return
+            if data == "tool_aivideo":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                m = bot_instance.send_message(
+                    call.message.chat.id,
+                    "🎬 <b>AI Video</b>\n"
+                    "Video promptunu yaz:\n"
+                    "<code>hacker typing in dark room, cinematic</code>\n"
+                    "<i>Iptal: iptal</i>",
+                    parse_mode="HTML",
+                )
+                bot_instance.register_next_step_handler(m, lambda m: _process_aivideo(m, bot_instance))
+                return
             if data == "tool_aiimg":
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
@@ -6489,6 +6654,287 @@ def _combo_engine(domain, limit=None):
     return uniq, None, " + ".join(apis)
 
 
+
+def _ai_clean_branding(text):
+    if not text:
+        return text
+    s = str(text)
+    for a, b in [
+        ("DARK LMNx9", "hackledin"), ("DARK LMNX9", "hackledin"),
+        ("@x_LMNx9", "@hackledin"), ("@x_lmnx9", "@hackledin"),
+        ("lmnx9.shop", "hackledin"), ("api.lmnx9.shop", "hackledin"),
+        ("LMNx9", "hackledin"), ("LMNX9", "hackledin"),
+    ]:
+        s = s.replace(a, b)
+    return s
+
+
+def _ai_extract_reply(data):
+    """API cevabindan dogal metin cikar."""
+    if data is None:
+        return None
+    if isinstance(data, str):
+        return _ai_clean_branding(data.strip())
+    if isinstance(data, dict):
+        for k in ("reply", "response", "answer", "message", "result", "output", "text", "content", "sukhi"):
+            v = data.get(k)
+            if isinstance(v, str) and v.strip():
+                return _ai_clean_branding(v.strip())
+            if isinstance(v, dict):
+                inner = _ai_extract_reply(v)
+                if inner:
+                    return inner
+        # nested data
+        if "data" in data:
+            return _ai_extract_reply(data["data"])
+    return _ai_clean_branding(str(data))
+
+
+def _ai_send_chat_chunks(bot_instance, chat_id, text, reply_markup=None):
+    """Uzun cevabi parcala; kod bloklarini dosya olarak gonder."""
+    text = _ai_clean_branding(text or "")
+    if not text.strip():
+        bot_instance.send_message(chat_id, "Cevap bos geldi, tekrar dene.")
+        return
+
+    pattern = re.compile(r"```(\w*)\n([\s\S]*?)```")
+    pos = 0
+    sent_any = False
+    for m in pattern.finditer(text):
+        # onceki duz metin
+        before = text[pos:m.start()].strip()
+        if before:
+            while len(before) > 3500:
+                bot_instance.send_message(chat_id, before[:3500])
+                before = before[3500:]
+                sent_any = True
+            if before:
+                bot_instance.send_message(chat_id, before)
+                sent_any = True
+        lang = (m.group(1) or "txt").strip().lower() or "txt"
+        code = m.group(2) or ""
+        ext_map = {
+            "python": "py", "py": "py", "javascript": "js", "js": "js",
+            "html": "html", "css": "css", "json": "json", "bash": "sh",
+            "shell": "sh", "sh": "sh", "sql": "sql", "php": "php",
+            "c": "c", "cpp": "cpp", "java": "java", "go": "go",
+            "rust": "rs", "txt": "txt", "xml": "xml", "yaml": "yml",
+            "typescript": "ts", "ts": "ts",
+        }
+        ext = ext_map.get(lang, "txt")
+        fname = f"code_{datetime.now().strftime('%H%M%S')}.{ext}"
+        try:
+            import io
+            buf = io.BytesIO(code.encode("utf-8"))
+            buf.name = fname
+            bot_instance.send_document(chat_id, buf, caption=f"📄 {fname}")
+            sent_any = True
+        except Exception:
+            bot_instance.send_message(
+                chat_id,
+                f"<pre>{html.escape(code[:3500])}</pre>",
+                parse_mode="HTML",
+            )
+            sent_any = True
+        pos = m.end()
+
+    rest = text[pos:].strip()
+    if rest:
+        while len(rest) > 3500:
+            bot_instance.send_message(chat_id, rest[:3500])
+            rest = rest[3500:]
+            sent_any = True
+        if rest:
+            bot_instance.send_message(chat_id, rest, reply_markup=reply_markup)
+            sent_any = True
+    elif reply_markup and sent_any:
+        bot_instance.send_message(chat_id, "Devam etmek ister misin?", reply_markup=reply_markup)
+    elif not sent_any:
+        bot_instance.send_message(chat_id, text[:4000], reply_markup=reply_markup)
+
+
+def _hackergpt_kb():
+    mk = InlineKeyboardMarkup(row_width=2)
+    mk.add(_btn("💬 Devam et", "hackergpt_continue"), _btn("🛑 Bitir", "hackergpt_end"))
+    mk.add(_btn("◀️ Araclar", "goto_tools"))
+    return mk
+
+
+def _process_hackergpt(msg, bot_instance):
+    uid = msg.from_user.id
+    if enforce_ban(uid):
+        bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
+        return
+    text = (msg.text or "").strip()
+    if not text:
+        return
+    if text.lower() in ("iptal", "cancel", "q", "bitir", "stop"):
+        USER_STATES.pop(uid, None)
+        bot_instance.reply_to(msg, "Sohbet kapandi.")
+        return
+    wait = bot_instance.reply_to(msg, "💀 dusunuyor...")
+    try:
+        url = HACKER_GPT_URL + quote(text, safe="")
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=90, verify=False)
+        data = None
+        try:
+            data = r.json()
+        except Exception:
+            data = r.text
+        reply = _ai_extract_reply(data)
+        if not reply:
+            reply = "Bir sey diyemedim, baska turlu sor."
+        try:
+            bot_instance.delete_message(msg.chat.id, wait.message_id)
+        except Exception:
+            pass
+        _ai_send_chat_chunks(bot_instance, msg.chat.id, reply, reply_markup=_hackergpt_kb())
+        # sohbet devam
+        USER_STATES[uid] = {"action": "hackergpt_chat"}
+        try:
+            bot_instance.register_next_step_handler(msg, lambda m: _process_hackergpt(m, bot_instance))
+        except Exception:
+            pass
+    except Exception as e:
+        try:
+            bot_instance.edit_message_text(f"Hata: {e}", msg.chat.id, wait.message_id)
+        except Exception:
+            bot_instance.send_message(msg.chat.id, f"Hata: {e}")
+
+
+def _process_3dlogo(msg, bot_instance):
+    uid = msg.from_user.id
+    if enforce_ban(uid):
+        bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
+        return
+    prompt = (msg.text or "").strip()
+    if not prompt or prompt.lower() in ("iptal", "cancel", "q"):
+        bot_instance.reply_to(msg, "Iptal.")
+        return
+    wait = bot_instance.reply_to(msg, "🎨 logo hazirlaniyor...")
+    try:
+        url = AI_3D_LOGO_URL + quote(prompt, safe="")
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=120, verify=False)
+        data = {}
+        try:
+            data = r.json()
+        except Exception:
+            data = {}
+        data = _lmnx_sanitize(data) if isinstance(data, (dict, list)) else data
+        images = []
+        if isinstance(data, dict):
+            for k in ("images", "image", "url", "result", "output"):
+                v = data.get(k)
+                if isinstance(v, list):
+                    images.extend([x for x in v if isinstance(x, str) and x.startswith("http")])
+                elif isinstance(v, str) and v.startswith("http"):
+                    images.append(v)
+        # regex fallback
+        if not images:
+            images = re.findall(r"https?://[^\s\"']+\.(?:webp|png|jpg|jpeg|gif)", r.text or "", flags=re.I)
+            if not images:
+                images = re.findall(r"https?://cdn\.photoroom\.com[^\s\"']+", r.text or "")
+        if not images:
+            try:
+                bot_instance.edit_message_text("Fotograf bulunamadi, promptu degistirip dene.", msg.chat.id, wait.message_id)
+            except Exception:
+                bot_instance.send_message(msg.chat.id, "Fotograf bulunamadi.")
+            return
+        try:
+            bot_instance.delete_message(msg.chat.id, wait.message_id)
+        except Exception:
+            pass
+        for i, img in enumerate(images[:4], 1):
+            try:
+                bot_instance.send_photo(
+                    msg.chat.id, img,
+                    caption=f"🎨 3D Logo {i}/{min(len(images),4)}\n📌 {html.escape(prompt[:80])}\n👨‍💻 @hackledin",
+                    parse_mode="HTML",
+                )
+            except Exception as e:
+                bot_instance.send_message(msg.chat.id, f"Gorsel {i} gonderilemedi: {e}\n{img}")
+    except Exception as e:
+        try:
+            bot_instance.edit_message_text(f"Hata: {e}", msg.chat.id, wait.message_id)
+        except Exception:
+            bot_instance.send_message(msg.chat.id, f"Hata: {e}")
+
+
+def _process_aivideo(msg, bot_instance):
+    uid = msg.from_user.id
+    if enforce_ban(uid):
+        bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
+        return
+    prompt = (msg.text or "").strip()
+    if not prompt or prompt.lower() in ("iptal", "cancel", "q"):
+        bot_instance.reply_to(msg, "Iptal.")
+        return
+    wait = bot_instance.reply_to(msg, "🎬 video hazirlaniyor, biraz surebilir...")
+    try:
+        url = AI_VIDEO_URL + quote(prompt, safe="")
+        r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=180, verify=False)
+        data = {}
+        try:
+            data = r.json()
+        except Exception:
+            data = {}
+        if isinstance(data, (dict, list)):
+            data = _lmnx_sanitize(data)
+        video_url = None
+        if isinstance(data, dict):
+            for k in ("url", "video", "video_url", "result", "link", "output"):
+                v = data.get(k)
+                if isinstance(v, str) and v.startswith("http"):
+                    video_url = v
+                    break
+        if not video_url:
+            m = re.search(r"https?://[^\s\"']+\.mp4", r.text or "", flags=re.I)
+            if m:
+                video_url = m.group(0)
+        if not video_url:
+            try:
+                bot_instance.edit_message_text("Video URL bulunamadi.", msg.chat.id, wait.message_id)
+            except Exception:
+                bot_instance.send_message(msg.chat.id, "Video bulunamadi.")
+            return
+        try:
+            bot_instance.delete_message(msg.chat.id, wait.message_id)
+        except Exception:
+            pass
+        # once URL ile dene
+        try:
+            bot_instance.send_video(
+                msg.chat.id,
+                video_url,
+                caption=f"🎬 AI Video\n📌 {html.escape(prompt[:80])}\n👨‍💻 @hackledin",
+                parse_mode="HTML",
+                timeout=120,
+            )
+        except Exception:
+            # indirip dosya olarak gonder
+            try:
+                vr = requests.get(video_url, timeout=120, verify=False)
+                import io
+                buf = io.BytesIO(vr.content)
+                buf.name = "ai_video.mp4"
+                bot_instance.send_video(
+                    msg.chat.id, buf,
+                    caption=f"🎬 AI Video\n📌 {html.escape(prompt[:80])}\n👨‍💻 @hackledin",
+                    parse_mode="HTML",
+                    timeout=120,
+                )
+            except Exception as e2:
+                bot_instance.send_message(
+                    msg.chat.id,
+                    f"Video gonderilemedi, link:\n{video_url}\n\n{e2}"
+                )
+    except Exception as e:
+        try:
+            bot_instance.edit_message_text(f"Hata: {e}", msg.chat.id, wait.message_id)
+        except Exception:
+            bot_instance.send_message(msg.chat.id, f"Hata: {e}")
+
+
 def _process_lmnx_step(msg, key, bot_instance):
     uid = msg.from_user.id
     if enforce_ban(uid):
@@ -6511,9 +6957,8 @@ def _process_lmnx(msg, key, text, bot_instance, sm=None):
     if not info:
         return
     url_t, name, prompt, cat, free = info
-    v = text.strip()
+    v = (text or "").strip()
     v2 = ""
-    # iki parametreli araclar
     if key in ("lmnx_port", "lmnx_bcryptv", "lmnx_argon2v", "lmnx_hmac", "lmnx_xor", "lmnx_aescbc", "lmnx_aesgcm"):
         parts = v.split(None, 1)
         if len(parts) < 2 and key != "lmnx_mailc":
@@ -6527,7 +6972,7 @@ def _process_lmnx(msg, key, text, bot_instance, sm=None):
         if len(parts) >= 2:
             v, v2 = parts[0], parts[1]
         else:
-            v, v2 = parts[0], ""
+            v, v2 = (parts[0] if parts else ""), ""
     try:
         if "{v}" in url_t:
             url = url_t.replace("{v}", quote(v, safe="")).replace("{v2}", quote(v2, safe=""))
@@ -6535,53 +6980,51 @@ def _process_lmnx(msg, key, text, bot_instance, sm=None):
             url = url_t
         r = requests.get(url, headers={"User-Agent": "Mozilla/5.0"}, timeout=45, verify=False)
         body = r.text or ""
+        data = None
         try:
             data = r.json()
-            out = json.dumps(data, indent=2, ensure_ascii=False)
         except Exception:
-            out = body[:3500]
-        if len(out) > 3500:
-            out = out[:3500] + "\n... (kisaltildi)"
-        txt = (
-            f"🛠 <b>{name}</b>\n"
-            f"━━━━━━━━━━━━━━━━━━━━━\n"
-            f"<code>{html.escape(out)}</code>"
-        )
-        # AI image/video: URL iceriyorsa gonder
-        if key in ("lmnx_aiimg", "lmnx_aivid", "lmnx_3dlogo") and ("http" in out.lower()):
-            try:
-                j = json.loads(body) if body.strip().startswith("{") else None
-            except Exception:
-                j = None
-            img_url = None
-            if isinstance(j, dict):
-                for k in ("url", "image", "image_url", "result", "output"):
-                    if isinstance(j.get(k), str) and j[k].startswith("http"):
-                        img_url = j[k]
-                        break
-            if img_url:
+            data = {"result": body[:4000]} if body.strip() else None
+        data = _lmnx_sanitize(data)
+        queried = (v + (" " + v2 if v2 else "")).strip()
+        out = _lmnx_format_text(name, queried, data)
+        # txt dosya olarak gonder
+        fname = f"LMNX_{key}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        try:
+            import io
+            buf = io.BytesIO(out.encode("utf-8"))
+            buf.name = fname
+            bot_instance.send_document(
+                msg.chat.id,
+                buf,
+                caption=f"🛠 <b>{html.escape(name)}</b>\n👨‍💻 @hackledin",
+                parse_mode="HTML",
+            )
+            if sm:
                 try:
-                    bot_instance.send_photo(msg.chat.id, img_url, caption=f"🛠 {name}")
-                    if sm:
-                        try: bot_instance.delete_message(msg.chat.id, sm.message_id)
-                        except: pass
-                    return
+                    bot_instance.delete_message(msg.chat.id, sm.message_id)
                 except Exception:
                     pass
-        if sm:
+        except Exception as e:
+            # fallback: mesaj olarak
+            short = out if len(out) < 3500 else out[:3500] + "\n..."
             try:
-                bot_instance.edit_message_text(txt, msg.chat.id, sm.message_id, parse_mode="HTML")
+                if sm:
+                    bot_instance.edit_message_text(
+                        f"<pre>{html.escape(short)}</pre>",
+                        msg.chat.id, sm.message_id, parse_mode="HTML"
+                    )
+                else:
+                    bot_instance.send_message(msg.chat.id, f"<pre>{html.escape(short)}</pre>", parse_mode="HTML")
             except Exception:
-                bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
-        else:
-            bot_instance.send_message(msg.chat.id, txt, parse_mode="HTML")
+                bot_instance.send_message(msg.chat.id, short)
     except Exception as e:
-        err = f"❌ Hata: <code>{html.escape(str(e))}</code>"
+        err = f"❌ Hata: {e}"
         try:
             if sm:
-                bot_instance.edit_message_text(err, msg.chat.id, sm.message_id, parse_mode="HTML")
+                bot_instance.edit_message_text(err, msg.chat.id, sm.message_id)
             else:
-                bot_instance.send_message(msg.chat.id, err, parse_mode="HTML")
+                bot_instance.send_message(msg.chat.id, err)
         except Exception:
             pass
 
