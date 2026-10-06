@@ -54,119 +54,47 @@ DB_PATH       = "cyber_searcher.db"
 BOT_REGISTRY_FILE = "bot_registry.json"
 PREMIUM_PRICE = 400
 OSINT_PRICE = 200
-LMNX_PRICE = 300  # Network/Crypto/Info tools premium
+# SearchX 😈 Premium paketleri
+SEARCHX_PRICE_DAY   = 200
+SEARCHX_PRICE_WEEK  = 400
+SEARCHX_PRICE_MONTH = 1000
+LMNX_PRICE = SEARCHX_PRICE_MONTH  # geriye uyumluluk
 
 def lmnx_premium_text():
     return (
-        "⚡ <b>NEXUS Lab Premium</b>\n"
+        "😈 <b>SearchX Premium</b>\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
-        f"💰 Fiyat: <b>{LMNX_PRICE} Telegram Yıldızı</b>\n"
-        "♾️ Süre: Ömür boyu\n\n"
-        "🤖 <b>AI — Ücretsiz (herkese açık)</b>\n"
-        "   • 💀 Hacker GPT — sohbet & kod\n"
-        "   • 🎨 3D Logo — görsel\n"
-        "   • 🎬 AI Video — video\n\n"
-        "🌐 <b>Network / Host</b>\n"
-        "   • Subdomain Scan\n"
-        "   • DNS Lookup\n"
-        "   • Ping · HTTP · Link Check\n"
-        "   • WHOIS · SSL Info\n"
-        "   • Reverse DNS · Port Scan\n\n"
-        "🔐 <b>Encode / Crypto</b>\n"
-        "   • Base64 / Base85\n"
-        "   • Hex · URL · Binary · Octal\n"
-        "   • MD5 · SHA1 · SHA256 · SHA512 · CRC32\n"
-        "   • ROT13 / ROT47\n"
-        "   • Bcrypt / Argon2 (+ verify)\n"
-        "   • HMAC · XOR · AES-CBC · AES-GCM\n"
-        "   • Hash Identify\n\n"
-        "📱 <b>Info / Lookup</b>\n"
-        "   • TG Channel · TG OTP\n"
-        "   • Twitter · TikTok · Truecaller\n"
-        "   • BIN · IMEI\n"
-        "   • Free Fire Info / Ban\n"
+        "📦 <b>Paketler</b>\n"
+        f"📅 1 Günlük     — <b>{SEARCHX_PRICE_DAY}⭐</b>\n"
+        f"📆 1 Haftalık   — <b>{SEARCHX_PRICE_WEEK}⭐</b>\n"
+        f"🗓 1 Aylık      — <b>{SEARCHX_PRICE_MONTH}⭐</b>\n"
+        "♾️ Ömür boyu   — <b>@hackledin</b> ile iletişime geç\n\n"
+        "🤖 <b>AI — Ücretsiz</b>\n"
+        "   • 💀 Hacker GPT\n"
+        "   • 🎨 3D Logo\n"
+        "   • 🎬 AI Video\n\n"
+        "🌐 <b>Network Lab</b>\n"
+        "   • Subdomain · DNS · Ping · HTTP · Link\n"
+        "   • WHOIS · SSL · Reverse · Port\n\n"
+        "🔐 <b>Crypto Lab</b>\n"
+        "   • Base64/85 · Hex · URL · Binary · Octal\n"
+        "   • MD5/SHA · ROT · Bcrypt · Argon2\n"
+        "   • HMAC · XOR · AES · Hash Identify\n\n"
+        "📱 <b>Intel Lookup</b>\n"
+        "   • TG Channel · OTP · Twitter · TikTok\n"
+        "   • Truecaller · IMEI · FF Info/Ban\n"
+        "   • 💳 BIN Lookup\n"
         "   • Darkweb · Deep Search\n\n"
-        "📧 <b>Temp Mail</b>\n"
-        "   • Create · Check inbox\n\n"
+        "💳 <b>Card Tools</b>\n"
+        "   • CC Generator (BIN ile kart üret)\n\n"
+        "📧 <b>Ghost Mail</b>\n"
+        "   • TempMail Create · Check\n\n"
         "━━━━━━━━━━━━━━━━━━━━━\n"
+        "💬 Ömür boyu: @hackledin\n"
         "👨‍💻 Developer: @hackledin"
     )
 
-# ── Free AI (Hacker GPT / 3D Logo / Video) ──
-HACKER_GPT_URL = "https://dark-ai.lmnx9.workers.dev/?sukhi="
-AI_3D_LOGO_URL = "https://3d-logo.lmnx9.workers.dev/?prompt="
-AI_VIDEO_URL   = "https://api.lmnx9.shop/ai/video.php?prompt="
-LOG_PRICE = 600
-FREE_CHECK_LIMIT = 3000
-PREMIUM_CHECK_LIMIT = 999999
-FREE_CAPTURE_LIMIT = 3
-PREMIUM_CAPTURE_LIMIT = 999
-FREE_KEYWORD_LIMIT = 3
-PREMIUM_KEYWORD_LIMIT = 999
-SMS_COUNT = 41
-# ══════════════════════════════════════════════════════════════
-#  🆔 ACCOUNT ID SORGU (Supabase)
-# ══════════════════════════════════════════════════════════════
-SUPABASE_URL = "https://bxqwroqjcfkofqudxuwb.supabase.co"
-SUPABASE_KEY = "sb_publishable_9KqeC8AE03BsGp0U9UOJPA_7kiC1yAs"
-ACCID_FREE_LIMIT = 1
-ACCID_PACKAGE_25 = 25
-ACCID_PACKAGE_45 = 45
-ACCID_PACKAGE_95 = 95
-ACCID_PRICE_25   = 89
-ACCID_PRICE_45   = 150
-ACCID_PRICE_95   = 380
 
-
-# ══════════════════════════════════════════════════════════════
-#  📂 LOG ÇEKME API
-# ══════════════════════════════════════════════════════════════
-LOG_API_BASE   = "https://site-viphesab.my-board.org/log.php"
-LOG_AUTH       = "@gaynotcu"
-LOG_FREE_LIMIT = 3          # Free kullanıcı 3 hak
-LOG_FREE_MAX   = 100        # Free'nin API limit=100
-
-# ══════════════════════════════════════════════════════════════
-#  🆔 TELEGRAM ID SORGU (gettg.id API)
-# ══════════════════════════════════════════════════════════════
-TGID_API_BASE          = "https://www.gettg.id/api/search?username="
-TGID_FREE_LIMIT        = 1   # Free kullanici sadece 1 hak
-TGID_PACKAGE_25        = 25
-TGID_PACKAGE_50        = 50
-TGID_PACKAGE_100       = 100
-TGID_PRICE_25          = 89
-TGID_PRICE_50          = 180
-TGID_PRICE_100         = 250
-# Vectra Exploits API (Telegram ID / Account ID birlesik servis)
-VECTRA_API_BASE        = "https://vectraenexploits.onlinee.bond/telegram.php"
-VECTRA_API_PARAM       = "exploits"
-
-# ══════════════════════════════════════════════════════════════
-#  🎨 AI IMAGE GENERATOR
-#  Primary: miaitool (arkadaş API) | Fallback: Pollinations (Railway uyumlu)
-# ══════════════════════════════════════════════════════════════
-AIIMG_API_URL          = "https://data.miaitool.com/api/text2image"
-AIIMG_SOURCE_URL       = "https://www.aidoimg.com/ai-image-tools/ai-image-generator/index"
-AIIMG_FALLBACK_URL     = "https://image.pollinations.ai/prompt/"
-AIIMG_FREE_LIMIT       = 2
-AIIMG_PACKAGE_10       = 10
-AIIMG_PACKAGE_20       = 20
-AIIMG_PACKAGE_30       = 30
-AIIMG_PACKAGE_50       = 50
-AIIMG_PACKAGE_100      = 100
-AIIMG_PRICE_10         = 84
-AIIMG_PRICE_20         = 100
-AIIMG_PRICE_30         = 150
-AIIMG_PRICE_50         = 350
-AIIMG_PRICE_100        = 600
-AIIMG_SIZE             = "576x1024"
-AIIMG_WIDTH            = 576
-AIIMG_HEIGHT           = 1024
-
-# ══════════════════════════════════════════════════════════════
-#  YT-DLP POT PROVIDER AYARI
-# ══════════════════════════════════════════════════════════════
-POT_PROVIDER_URL = "http://127.0.0.1:4416"
 
 def _ytdlp_common_opts():
     return {
@@ -211,7 +139,8 @@ def db_init():
         capture_used INTEGER DEFAULT 0,
         log_used INTEGER DEFAULT 0,
         is_premium_lmnx INTEGER DEFAULT 0,
-        premium_lmnx_date TEXT DEFAULT ''
+        premium_lmnx_date TEXT DEFAULT '',
+        premium_lmnx_until TEXT DEFAULT ''
     )''')
     # Eski DB'ler için kolon ekle
     for col, typedef in [
@@ -220,6 +149,7 @@ def db_init():
         ("log_used", "INTEGER DEFAULT 0"),
         ("is_premium_lmnx", "INTEGER DEFAULT 0"),
         ("premium_lmnx_date", "TEXT DEFAULT ''"),
+        ("premium_lmnx_until", "TEXT DEFAULT ''"),
     ]:
         try:
             c.execute(f"ALTER TABLE users ADD COLUMN {col} {typedef}")
@@ -384,26 +314,76 @@ def is_premium_osint(user_id):
 
 
 def is_premium_lmnx(user_id):
+    """SearchX premium — sure kontrolu."""
     try:
-        return _as_int_flag(db_get(user_id, "is_premium_lmnx"))
-    except:
+        if user_id == ADMIN_ID:
+            return True
+        if not _as_int_flag(db_get(user_id, "is_premium_lmnx")):
+            return False
+        until = db_get(user_id, "premium_lmnx_until") or ""
+        if not until or until in ("lifetime", "omur", "∞"):
+            # eski kayit veya omur boyu
+            return True
+        try:
+            exp = datetime.strptime(until[:19], "%Y-%m-%d %H:%M:%S")
+            if datetime.now() > exp:
+                db_set(user_id, "is_premium_lmnx", 0)
+                return False
+            return True
+        except Exception:
+            return True
+    except Exception:
         return False
 
-def set_premium_lmnx(user_id, username=""):
+def searchx_premium_left(user_id):
+    """Kalan sure metni."""
+    if user_id == ADMIN_ID:
+        return "♾️ Admin"
+    if not is_premium_lmnx(user_id):
+        return "Yok"
+    until = db_get(user_id, "premium_lmnx_until") or ""
+    if not until or until in ("lifetime", "omur", "∞"):
+        return "♾️ Omur boyu"
+    try:
+        exp = datetime.strptime(until[:19], "%Y-%m-%d %H:%M:%S")
+        left = exp - datetime.now()
+        if left.total_seconds() <= 0:
+            return "Suresi dolmus"
+        days = left.days
+        hours = left.seconds // 3600
+        if days > 0:
+            return f"{days} gun {hours} saat"
+        return f"{hours} saat"
+    except Exception:
+        return until
+
+def set_premium_lmnx(user_id, username="", days=30, stars=None, package_label=None):
+    """days=None veya 0 => omur boyu."""
     try:
         add_user(user_id, username or "", "")
         conn = sqlite3.connect(DB_PATH)
         c = conn.cursor()
-        now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-        c.execute("UPDATE users SET is_premium_lmnx=1, premium_lmnx_date=? WHERE user_id=?", (now, user_id))
+        now = datetime.now()
+        now_s = now.strftime("%Y-%m-%d %H:%M:%S")
+        if days is None or days <= 0:
+            until = "lifetime"
+            label = package_label or "SearchX Omur Boyu"
+        else:
+            until = (now + __import__("datetime").timedelta(days=int(days))).strftime("%Y-%m-%d %H:%M:%S")
+            label = package_label or f"SearchX {days}g"
+        amount = stars if stars is not None else LMNX_PRICE
+        c.execute(
+            "UPDATE users SET is_premium_lmnx=1, premium_lmnx_date=?, premium_lmnx_until=? WHERE user_id=?",
+            (now_s, until, user_id)
+        )
         if c.rowcount == 0:
             c.execute(
-                "INSERT INTO users (user_id,username,is_premium_lmnx,premium_lmnx_date,join_date) VALUES (?,?,1,?,?)",
-                (user_id, username or "", now, now)
+                "INSERT INTO users (user_id,username,is_premium_lmnx,premium_lmnx_date,premium_lmnx_until,join_date) VALUES (?,?,1,?,?,?)",
+                (user_id, username or "", now_s, until, now_s)
             )
         c.execute(
             "INSERT INTO premium_logs (user_id,username,package,amount,date) VALUES (?,?,?,?,?)",
-            (user_id, username or "", "LMNX", LMNX_PRICE, now)
+            (user_id, username or "", label, amount, now_s)
         )
         conn.commit()
         conn.close()
@@ -416,6 +396,7 @@ def remove_premium_lmnx(user_id):
     add_user(user_id)
     db_set(user_id, "is_premium_lmnx", 0)
     db_set(user_id, "premium_lmnx_date", "")
+    db_set(user_id, "premium_lmnx_until", "")
 
 def is_premium_log(user_id):
     try:
@@ -2353,36 +2334,41 @@ S = {
             "TC · TC Pro · Ad Soyad · Aile · Aile Pro\n"
             "Sülale · TC→GSM · GSM→TC · Plaka\n"
             "E-Okul · Tapu · Ada Parsel · Adres\n\n"
-            "⚡ <b>NEXUS Lab</b>\n"
+            "😈 <b>SearchX</b>\n"
             "🤖 AI (Ücretsiz): Hacker GPT · 3D Logo · AI Video\n"
-            "💎 Premium <b>300⭐</b> — ömür boyu:\n"
+            "💎 Premium paketler:\n"
+            "   📅 1 Gün 200⭐ · 📆 1 Hafta 400⭐\n"
+            "   🗓 1 Ay 1000⭐ · ♾️ Ömür boyu @hackledin\n"
+            "   💳 CC Generator + BIN Lookup dahil\n"
             "🌐 Network: Subdomain · DNS · Ping · HTTP\n"
             "   Link · WHOIS · SSL · Reverse · Port\n"
             "🔐 Crypto: Base64/85 · Hex · URL · Binary\n"
             "   MD5/SHA · ROT · Bcrypt · Argon2\n"
             "   HMAC · XOR · AES · Hash Identify\n"
-            "📱 Info: TG Channel · OTP · Twitter · TikTok\n"
-            "   Truecaller · BIN · IMEI · FF · Darkweb\n"
-            "📧 TempMail: Create · Check\n\n"
+            "📱 Intel: TG · Twitter · TikTok · Truecaller\n"
+            "   BIN · IMEI · FF · Darkweb\n"
+            "💳 Card Tools: CC Generator\n"
+            "📧 Ghost Mail: Create · Check\n\n"
             "🛠 <b>DİĞER ARAÇLAR</b>\n"
             "📦 Combo · 📧 Hotmail · 📸 Capture\n"
             "🎥 Video · 🎵 Müzik · 💣 SMS Bomber\n"
             "🌐 IP · 🔎 DNS · 🛡️ Proxy · 🔍 URL Scan\n"
-            "💳 CC Gen · 🤖 Discord/TG Token\n"
-            "💊 Eczane · ⚽ Bahis · 📸 EXIF · 🐍 PHP→Py\n\n"
+            "🤖 Discord/TG Token · 💊 Eczane · ⚽ Bahis\n"
+            "📸 EXIF · 🐍 PHP→Py\n\n"
             "🆔 <b>TELEGRAM ID</b>\n"
-            "Free hak · Paket 25/50/100 · Premium sınırsız\n\n"
+            "Free hak · Paket 25/50/100\n\n"
             "🎨 <b>AI IMAGE</b>\n"
             "Free 2 hak · +18 ayrı · Yıldız ile paket\n\n"
             "📂 <b>LOG ÇEKME</b>\n"
             "Free 3 hak · Premium sınırsız · 2025-2026\n\n"
             "⭐ <b>PREMIUM PAKETLER</b>\n"
             "🌟 Hotmail Premium — <b>400⭐</b>\n"
-            "⚡ NEXUS Lab Premium — <b>300⭐</b>\n"
+            "😈 SearchX — 200/400/1000⭐ (gün/hafta/ay)\n"
             "📂 LOG Premium — <b>600⭐</b>\n\n"
             "━━━━━━━━━━━━━━━━━━━━\n"
             "👨‍💻 <i>@hackledin</i>"
         ),
+
     },
     "en": {
         "welcome": "<b>🕵🏻 Cyber Search</b>\nWelcome, <b>{name}</b>!\n📌 Status: {status}\n🔻 Select an option:",
@@ -2584,6 +2570,7 @@ LMNX_APIS = {
     "lmnx_truecaller":("https://api.lmnx9.shop/info/truecaller.php?number={v}", "Truecaller", "Telefon (+90...):", "info", False),
     "lmnx_tiktok":   ("https://api.lmnx9.shop/info/tiktok.php?limit=10&username={v}", "TikTok Info", "TikTok username:", "info", False),
     "lmnx_bin":      ("https://api.lmnx9.shop/bin-lookup.php?bin={v}", "BIN Lookup", "BIN (6-8 hane):", "info", False),
+    "lmnx_ccgen":    ("https://wazelyapi.vercel.app/api/ccgen?bin={v}", "CC Generator", "BIN gir (orn: 450000):", "cards", False),
     "lmnx_imei":     ("https://api.lmnx9.shop/imei/info.php?imei={v}", "IMEI Info", "IMEI gir:", "info", False),
     "lmnx_ffinfo":   ("https://api.lmnx9.shop/ff/info.php?uid={v}", "FF Info", "Free Fire UID:", "info", False),
     "lmnx_ffban":    ("https://api.lmnx9.shop/ff/ban.php?uid={v}", "FF Ban Check", "Free Fire UID:", "info", False),
@@ -2603,6 +2590,7 @@ LMNX_CATS = {
     "net":    ("🌐 Network Lab", ["lmnx_sub","lmnx_dns","lmnx_ping","lmnx_http","lmnx_link","lmnx_whois","lmnx_ssl","lmnx_reverse","lmnx_port"]),
     "crypto": ("🔐 Crypto Lab", ["lmnx_b64e","lmnx_b64d","lmnx_b85e","lmnx_b85d","lmnx_hexe","lmnx_hexd","lmnx_urle","lmnx_urld","lmnx_md5","lmnx_sha1","lmnx_sha256","lmnx_sha512","lmnx_crc32","lmnx_rot13","lmnx_rot47","lmnx_bine","lmnx_bind","lmnx_octe","lmnx_octd","lmnx_bcrypt","lmnx_bcryptv","lmnx_argon2","lmnx_argon2v","lmnx_hmac","lmnx_xor","lmnx_aescbc","lmnx_aesgcm","lmnx_hashid"]),
     "info":   ("📱 Intel Lookup", ["lmnx_tgch","lmnx_tgotp","lmnx_twitter","lmnx_truecaller","lmnx_tiktok","lmnx_bin","lmnx_imei","lmnx_ffinfo","lmnx_ffban","lmnx_darkweb","lmnx_deep"]),
+    "cards":  ("💳 Card Tools", ["lmnx_ccgen", "lmnx_bin"]),
     "mail":   ("📧 Ghost Mail", ["lmnx_mailc","lmnx_mailk"]),
 }
 
@@ -2733,12 +2721,23 @@ def lmnx_can_use(user_id, key):
 
 
 
+
+def searchx_packages_kb():
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(_btn(f"📅 1 Günlük — {SEARCHX_PRICE_DAY}⭐", "buy_sx_day"))
+    mk.add(_btn(f"📆 1 Haftalık — {SEARCHX_PRICE_WEEK}⭐", "buy_sx_week"))
+    mk.add(_btn(f"🗓 1 Aylık — {SEARCHX_PRICE_MONTH}⭐", "buy_sx_month"))
+    mk.add(_btn("♾️ Ömür Boyu — @hackledin", "buy_sx_life"))
+    mk.add(_btn("📋 İçerik neler?", "lmnx_info"))
+    mk.add(_btn("◀️ SearchX 😈", "menu_lmnx"))
+    return mk
+
 def lmnx_main_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=1)
     if user_id == ADMIN_ID or is_premium_lmnx(user_id):
-        mk.add(_btn("⭐ NEXUS Premium Aktif", "noop"))
+        mk.add(_btn("⭐ SearchX Premium Aktif", "noop"))
     else:
-        mk.add(_btn(f"💎 NEXUS Premium — {LMNX_PRICE}⭐", "buy_lmnx"))
+        mk.add(_btn("💎 SearchX Premium Al", "buy_lmnx"))
     mk.add(_btn("📋 Premium içeriği neler?", "lmnx_info"))
     for cat, (title, keys) in LMNX_CATS.items():
         tag = " 🆓" if cat == "ai" else " 🔒" if not (user_id == ADMIN_ID or is_premium_lmnx(user_id)) and cat != "ai" else ""
@@ -2756,7 +2755,7 @@ def lmnx_cat_kb(user_id, cat):
         "lmnx_link": "🔗", "lmnx_whois": "📜", "lmnx_ssl": "🔒", "lmnx_reverse": "🔄",
         "lmnx_port": "🔌", "lmnx_b64e": "🔐", "lmnx_b64d": "🔓", "lmnx_md5": "🔑",
         "lmnx_sha256": "🔑", "lmnx_tgch": "📢", "lmnx_truecaller": "📞",
-        "lmnx_bin": "💳", "lmnx_imei": "📱", "lmnx_darkweb": "🌑",
+        "lmnx_bin": "💳", "lmnx_ccgen": "💳", "lmnx_imei": "📱", "lmnx_darkweb": "🌑",
         "lmnx_mailc": "✉️", "lmnx_mailk": "📬",
     }
     for k in keys:
@@ -2764,7 +2763,7 @@ def lmnx_cat_kb(user_id, cat):
         em = emoji_map.get(k, "▪️")
         tag = " 🆓" if free else ""
         mk.add(_btn(f"{em} {name}{tag}", f"lmnx_tool_{k}"))
-    mk.add(_btn("◀️ NEXUS Lab", "menu_lmnx"))
+    mk.add(_btn("◀️ SearchX 😈", "menu_lmnx"))
     return mk
 
 
@@ -2861,9 +2860,9 @@ TURKEY_PROMPTS = {
 
 def tools_kb(user_id):
     mk = InlineKeyboardMarkup(row_width=2)
-    mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn("⚡ NEXUS Lab", "menu_lmnx"))
+    mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn("SearchX 😈", "menu_lmnx"))
     mk.add(
-        _btn("🎮 MC Bedrock", "tool_bedrock"), _btn("💳 CC Generator", "tool_ccgen"),
+        _btn("🎮 MC Bedrock", "tool_bedrock"), _btn("💳 CC Gen (SearchX)", "menu_lmnx"),
         _btn("🤖 Discord Token", "tool_dctoken"), _btn("✈️ TG Token", "tool_tgtoken"),
         _btn("💊 Eczane", "tool_eczane"), _btn("🌐 IP Bilgi", "tool_ipinfo"),
         _btn("🔎 DNS Sorgu", "tool_dns"), _btn("⚽ Bahis Sorgu", "tool_bahis"),
@@ -5501,13 +5500,17 @@ def register_handlers(bot_instance):
                 except Exception:
                     pass
                 clear_user_flow(bot_instance, uid, call.message.chat.id)
-                prem = (uid == ADMIN_ID or is_premium_lmnx(uid))
+                prem = is_premium_lmnx(uid)
+                left = searchx_premium_left(uid)
                 txt = (
-                    "⚡ <b>NEXUS Lab</b>\n"
+                    "😈 <b>SearchX</b>\n"
                     "━━━━━━━━━━━━━━━━━━━━━\n"
-                    "🤖 AI araçları: <b>ÜCRETSİZ</b>\n"
-                    + (f"⭐ Premium: <b>Aktif</b>\n" if prem else f"💎 Premium: <b>{LMNX_PRICE}⭐</b> (Network · Crypto · Info · Mail)\n")
-                    + "\nKategori seç:"
+                    "🤖 AI: <b>ÜCRETSİZ</b>\n"
+                    + (f"⭐ Premium: <b>Aktif</b> ({left})\n" if prem else
+                       f"💎 Paketler: {SEARCHX_PRICE_DAY}⭐/gün · {SEARCHX_PRICE_WEEK}⭐/hafta · {SEARCHX_PRICE_MONTH}⭐/ay\n"
+                       "♾️ Ömür boyu: @hackledin\n")
+                    + "💳 CC Generator + BIN dahil\n\n"
+                    + "Kategori seç:"
                 )
                 try:
                     bot_instance.edit_message_text(
@@ -5526,8 +5529,8 @@ def register_handlers(bot_instance):
                     pass
                 mk = InlineKeyboardMarkup(row_width=1)
                 if not (uid == ADMIN_ID or is_premium_lmnx(uid)):
-                    mk.add(_btn(f"💎 Premium Al — {LMNX_PRICE}⭐", "buy_lmnx"))
-                mk.add(_btn("◀️ NEXUS Lab", "menu_lmnx"))
+                    mk.add(_btn("💎 Premium Paketleri", "buy_lmnx"))
+                mk.add(_btn("◀️ SearchX 😈", "menu_lmnx"))
                 try:
                     bot_instance.edit_message_text(
                         lmnx_premium_text(), call.message.chat.id, call.message.message_id,
@@ -5549,13 +5552,13 @@ def register_handlers(bot_instance):
                     try:
                         bot_instance.answer_callback_query(
                             call.id,
-                            f"💎 Bu kategori NEXUS Premium ister ({LMNX_PRICE}⭐)",
+                            f"💎 Bu kategori SearchX Premium ister ({LMNX_PRICE}⭐)",
                             show_alert=True
                         )
                     except Exception:
                         pass
                     mk = InlineKeyboardMarkup(row_width=1)
-                    mk.add(_btn(f"💎 Premium Al — {LMNX_PRICE}⭐", "buy_lmnx"))
+                    mk.add(_btn("💎 Premium Paketleri", "buy_lmnx"))
                     mk.add(_btn("📋 İçerik neler?", "lmnx_info"))
                     mk.add(_btn("◀️ Geri", "menu_lmnx"))
                     bot_instance.send_message(
@@ -5586,12 +5589,12 @@ def register_handlers(bot_instance):
                 if not lmnx_can_use(uid, key):
                     try:
                         bot_instance.answer_callback_query(
-                            call.id, f"💎 NEXUS Premium gerekli ({LMNX_PRICE}⭐)", show_alert=True
+                            call.id, f"💎 SearchX Premium gerekli ({LMNX_PRICE}⭐)", show_alert=True
                         )
                     except Exception:
                         pass
                     mk = InlineKeyboardMarkup(row_width=1)
-                    mk.add(_btn(f"💎 Premium Al — {LMNX_PRICE}⭐", "buy_lmnx"))
+                    mk.add(_btn("💎 Premium Paketleri", "buy_lmnx"))
                     mk.add(_btn("📋 İçerik neler?", "lmnx_info"))
                     bot_instance.send_message(
                         call.message.chat.id, lmnx_premium_text(), reply_markup=mk, parse_mode="HTML"
@@ -5644,29 +5647,93 @@ def register_handlers(bot_instance):
                 return
             if data == "buy_lmnx":
                 clear_user_flow(bot_instance, uid, call.message.chat.id)
-                if is_premium_lmnx(uid):
-                    try:
-                        bot_instance.answer_callback_query(call.id, "Zaten premium!", show_alert=True)
-                    except Exception:
-                        pass
-                    return
-                prices = [LabeledPrice(label="⚡ NEXUS Lab Premium", amount=LMNX_PRICE)]
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                left = searchx_premium_left(uid)
+                txt = (
+                    "😈 <b>SearchX Premium Paketleri</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
+                    f"📌 Mevcut: <b>{left}</b>\n\n"
+                    f"📅 1 Günlük     — <b>{SEARCHX_PRICE_DAY}⭐</b>\n"
+                    f"📆 1 Haftalık   — <b>{SEARCHX_PRICE_WEEK}⭐</b>\n"
+                    f"🗓 1 Aylık      — <b>{SEARCHX_PRICE_MONTH}⭐</b>\n"
+                    "♾️ Ömür boyu   — <b>@hackledin</b>\n\n"
+                    "💳 CC Generator + 📱 BIN Lookup dahil!"
+                )
+                try:
+                    bot_instance.edit_message_text(
+                        txt, call.message.chat.id, call.message.message_id,
+                        reply_markup=searchx_packages_kb(), parse_mode="HTML"
+                    )
+                except Exception:
+                    bot_instance.send_message(
+                        call.message.chat.id, txt, reply_markup=searchx_packages_kb(), parse_mode="HTML"
+                    )
+                return
+            if data == "buy_sx_day":
                 try:
                     bot_instance.send_invoice(
                         chat_id=call.message.chat.id,
-                        title="⚡ NEXUS Lab Premium",
-                        description="Network·Crypto·Info·TempMail + detayli arac seti",
-                        invoice_payload="lmnx",
+                        title="SearchX 😈 1 Gün",
+                        description="SearchX Premium — 1 gün (Network, Crypto, Intel, CC, Mail)",
+                        invoice_payload="sx_day",
                         provider_token="",
                         currency="XTR",
-                        prices=prices,
+                        prices=[LabeledPrice(label="SearchX 1 Gun", amount=SEARCHX_PRICE_DAY)],
                     )
                     bot_instance.answer_callback_query(call.id)
                 except Exception as e:
-                    try:
-                        bot_instance.answer_callback_query(call.id, str(e)[:180], show_alert=True)
-                    except Exception:
-                        pass
+                    try: bot_instance.answer_callback_query(call.id, str(e)[:180], show_alert=True)
+                    except Exception: pass
+                return
+            if data == "buy_sx_week":
+                try:
+                    bot_instance.send_invoice(
+                        chat_id=call.message.chat.id,
+                        title="SearchX 😈 1 Hafta",
+                        description="SearchX Premium — 7 gün",
+                        invoice_payload="sx_week",
+                        provider_token="",
+                        currency="XTR",
+                        prices=[LabeledPrice(label="SearchX 1 Hafta", amount=SEARCHX_PRICE_WEEK)],
+                    )
+                    bot_instance.answer_callback_query(call.id)
+                except Exception as e:
+                    try: bot_instance.answer_callback_query(call.id, str(e)[:180], show_alert=True)
+                    except Exception: pass
+                return
+            if data == "buy_sx_month":
+                try:
+                    bot_instance.send_invoice(
+                        chat_id=call.message.chat.id,
+                        title="SearchX 😈 1 Ay",
+                        description="SearchX Premium — 30 gün",
+                        invoice_payload="sx_month",
+                        provider_token="",
+                        currency="XTR",
+                        prices=[LabeledPrice(label="SearchX 1 Ay", amount=SEARCHX_PRICE_MONTH)],
+                    )
+                    bot_instance.answer_callback_query(call.id)
+                except Exception as e:
+                    try: bot_instance.answer_callback_query(call.id, str(e)[:180], show_alert=True)
+                    except Exception: pass
+                return
+            if data == "buy_sx_life":
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                bot_instance.send_message(
+                    call.message.chat.id,
+                    "♾️ <b>Ömür Boyu SearchX Premium</b>\n"
+                    "━━━━━━━━━━━━━━━━━━━━━\n"
+                    "Bu paket yildiz ile satilmaz.\n"
+                    "📩 Iletisim: <b>@hackledin</b>\n\n"
+                    "Yaz: <code>SearchX omur boyu istiyorum</code>",
+                    parse_mode="HTML"
+                )
                 return
             if data == "tool_hackergpt":
                 clear_user_flow(bot_instance, uid, call.message.chat.id)
@@ -6376,11 +6443,33 @@ def register_handlers(bot_instance):
             set_premium(uid, username)
             bot_instance.reply_to(msg, "🎉 **Hotmail Premium aktif!**\n📧 Sınırsız Hotmail + 📸 Sınırsız Capture + 🔖 Sınırsız Keyword + 🆔 Sınırsız TG-ID erişimi kazandın.")
             bot_instance.send_message(ADMIN_ID, f"📧 <b>YENİ HOTMAIL PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {PREMIUM_PRICE} Stars")
-        if payload == "lmnx":
-            set_premium_lmnx(uid, username)
-            bot_instance.reply_to(msg, f"🎉 <b>NEXUS Lab Premium aktif!</b>\n🌐 Network · 🔐 Crypto · 📱 Info · 📧 TempMail\n💰 {LMNX_PRICE}⭐\n\n📋 Tum araclar acildi.", parse_mode="HTML")
-            try: bot_instance.send_message(ADMIN_ID, f"🛠 <b>YENİ LMNX PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n💰 {LMNX_PRICE} Stars")
-            except: pass
+        elif payload in ("lmnx", "sx_day", "sx_week", "sx_month"):
+            pkg_map = {
+                "sx_day":   (1, SEARCHX_PRICE_DAY, "1 Günlük"),
+                "sx_week":  (7, SEARCHX_PRICE_WEEK, "1 Haftalık"),
+                "sx_month": (30, SEARCHX_PRICE_MONTH, "1 Aylık"),
+                "lmnx":     (30, SEARCHX_PRICE_MONTH, "1 Aylık"),
+            }
+            days, stars, label = pkg_map.get(payload, (30, SEARCHX_PRICE_MONTH, "1 Aylık"))
+            set_premium_lmnx(uid, username, days=days, stars=stars, package_label=f"SearchX {label}")
+            left = searchx_premium_left(uid)
+            bot_instance.reply_to(
+                msg,
+                f"🎉 <b>SearchX 😈 Premium aktif!</b>\n"
+                f"📦 Paket: <b>{label}</b>\n"
+                f"⏱ Kalan: <b>{left}</b>\n"
+                f"💰 {stars}⭐\n\n"
+                f"🌐 Network · 🔐 Crypto · 📱 Intel\n"
+                f"💳 CC Generator · 📧 Ghost Mail",
+                parse_mode="HTML"
+            )
+            try:
+                bot_instance.send_message(
+                    ADMIN_ID,
+                    f"😈 <b>YENİ SearchX PREMIUM</b>\n👤 @{username}\n🆔 {uid}\n📦 {label} — {stars}⭐"
+                )
+            except Exception:
+                pass
         elif payload == "osint":
 
             set_premium_osint(uid, username)
@@ -7202,7 +7291,7 @@ def _admin_lmnx_give_user(msg, bot_instance):
     if set_premium_lmnx(tid, tuname or str(tid)):
         bot_instance.reply_to(msg, f"✅ LMNX Premium verildi!\n👤 @{tuname or tid}\n🆔 <code>{tid}</code>", parse_mode="HTML")
         try:
-            bot_instance.send_message(tid, f"🎁 Admin sana <b>LMNX Tools Premium</b> verdi!\n🛠 Network · Crypto · Info aktif.", parse_mode="HTML")
+            bot_instance.send_message(tid, f"🎁 Admin sana <b>SearchX 😈 Premium</b> verdi!\n🌐 Network · 🔐 Crypto · 📱 Intel · 💳 CC · 📧 Mail", parse_mode="HTML")
         except Exception:
             pass
     else:
