@@ -69,7 +69,7 @@ def lmnx_premium_text():
         f"📆 1 Haftalık   — <b>{SEARCHX_PRICE_WEEK}⭐</b>\n"
         f"🗓 1 Aylık      — <b>{SEARCHX_PRICE_MONTH}⭐</b>\n"
         "♾️ Ömür boyu   — <b>@hackledin</b> ile iletişime geç\n\n"
-        "🤖 <b>AI — Ücretsiz</b>\n"
+        "🤖 <b>AI Studio</b>\n"
         "   • 💀 Hacker GPT\n"
         "   • 🎨 3D Logo\n"
         "   • 🎬 AI Video\n\n"
@@ -83,7 +83,6 @@ def lmnx_premium_text():
         "📱 <b>Intel Lookup</b>\n"
         "   • TG Channel · OTP · Twitter · TikTok\n"
         "   • Truecaller · IMEI · FF Info/Ban\n"
-        "   • 💳 BIN Lookup\n"
         "   • Darkweb · Deep Search\n\n"
         "💳 <b>Card Tools</b>\n"
         "   • CC Generator (BIN ile kart üret)\n\n"
@@ -2335,7 +2334,7 @@ S = {
             "Sülale · TC→GSM · GSM→TC · Plaka\n"
             "E-Okul · Tapu · Ada Parsel · Adres\n\n"
             "😈 <b>SearchX</b>\n"
-            "🤖 AI (Ücretsiz): Hacker GPT · 3D Logo · AI Video\n"
+            "🤖 AI Studio: Hacker GPT · 3D Logo · AI Video\n"
             "💎 Premium paketler:\n"
             "   📅 1 Gün 200⭐ · 📆 1 Hafta 400⭐\n"
             "   🗓 1 Ay 1000⭐ · ♾️ Ömür boyu @hackledin\n"
@@ -2577,9 +2576,9 @@ LMNX_APIS = {
     "lmnx_darkweb":  ("https://api.lmnx9.shop/search/darkweb.php?search={v}", "Darkweb Search", "Arama terimi:", "info", False),
     "lmnx_deep":     ("https://api.lmnx9.shop/search/deep.php?query={v}", "Deep Search", "Arama sorgusu:", "info", False),
     # AI (Free) — sadece LMNX > AI menusu
-    "lmnx_hackergpt": ("https://dark-ai.lmnx9.workers.dev/?sukhi={v}", "Hacker GPT", "Mesajini yaz:", "ai", True),
+    "lmnx_hackergpt": ("https://dark-ai.lmnx9.workers.dev/?sukhi={v}", "Hacker GPT", "Mesajini yaz:", "ai", False),
     "lmnx_3dlogo":    ("https://3d-logo.lmnx9.workers.dev/?prompt={v}", "3D Logo", "Logo prompt (EN):", "ai", True),
-    "lmnx_aivideo":   ("https://api.lmnx9.shop/ai/video.php?prompt={v}", "AI Video", "Video prompt:", "ai", True),
+    "lmnx_aivideo":   ("https://api.lmnx9.shop/ai/video.php?prompt={v}", "AI Video", "Video prompt:", "ai", False),
     # Tempmail
     "lmnx_mailc":    ("https://api.lmnx9.shop/tempmail/create.php", "TempMail Create", None, "mail", False),
     "lmnx_mailk":    ("https://api.lmnx9.shop/tempmail/check.php?token={v}", "TempMail Check", "Token gir:", "mail", False),
@@ -2589,7 +2588,7 @@ LMNX_CATS = {
     "ai":     ("🤖 AI Studio", ["lmnx_hackergpt", "lmnx_3dlogo", "lmnx_aivideo"]),
     "net":    ("🌐 Network Lab", ["lmnx_sub","lmnx_dns","lmnx_ping","lmnx_http","lmnx_link","lmnx_whois","lmnx_ssl","lmnx_reverse","lmnx_port"]),
     "crypto": ("🔐 Crypto Lab", ["lmnx_b64e","lmnx_b64d","lmnx_b85e","lmnx_b85d","lmnx_hexe","lmnx_hexd","lmnx_urle","lmnx_urld","lmnx_md5","lmnx_sha1","lmnx_sha256","lmnx_sha512","lmnx_crc32","lmnx_rot13","lmnx_rot47","lmnx_bine","lmnx_bind","lmnx_octe","lmnx_octd","lmnx_bcrypt","lmnx_bcryptv","lmnx_argon2","lmnx_argon2v","lmnx_hmac","lmnx_xor","lmnx_aescbc","lmnx_aesgcm","lmnx_hashid"]),
-    "info":   ("📱 Intel Lookup", ["lmnx_tgch","lmnx_tgotp","lmnx_twitter","lmnx_truecaller","lmnx_tiktok","lmnx_bin","lmnx_imei","lmnx_ffinfo","lmnx_ffban","lmnx_darkweb","lmnx_deep"]),
+    "info":   ("📱 Intel Lookup", ["lmnx_tgch","lmnx_tgotp","lmnx_twitter","lmnx_truecaller","lmnx_tiktok","lmnx_imei","lmnx_ffinfo","lmnx_ffban","lmnx_darkweb","lmnx_deep"]),
     "cards":  ("💳 Card Tools", ["lmnx_ccgen", "lmnx_bin"]),
     "mail":   ("📧 Ghost Mail", ["lmnx_mailc","lmnx_mailk"]),
 }
@@ -2709,12 +2708,9 @@ def _lmnx_format_text(name, queried, data):
 
 
 def lmnx_can_use(user_id, key):
-    """AI ucretsiz; digerleri premium veya admin."""
-    info = LMNX_APIS.get(key)
-    if not info:
+    """Tum SearchX araclar premium (veya admin)."""
+    if key not in LMNX_APIS:
         return False
-    if info[4]:  # free_ai
-        return True
     if user_id == ADMIN_ID or is_premium_lmnx(user_id):
         return True
     return False
@@ -2740,7 +2736,7 @@ def lmnx_main_kb(user_id):
         mk.add(_btn("💎 SearchX Premium Al", "buy_lmnx"))
     mk.add(_btn("📋 Premium içeriği neler?", "lmnx_info"))
     for cat, (title, keys) in LMNX_CATS.items():
-        tag = " 🆓" if cat == "ai" else " 🔒" if not (user_id == ADMIN_ID or is_premium_lmnx(user_id)) and cat != "ai" else ""
+        tag = "" if (user_id == ADMIN_ID or is_premium_lmnx(user_id)) else " 🔒"
         mk.add(_btn(f"{title}{tag}", f"lmnx_cat_{cat}"))
     mk.add(_btn("◀️ Geri", "goto_tools"))
     return mk
@@ -2761,7 +2757,7 @@ def lmnx_cat_kb(user_id, cat):
     for k in keys:
         url, name, prompt, c, free = LMNX_APIS[k]
         em = emoji_map.get(k, "▪️")
-        tag = " 🆓" if free else ""
+        tag = ""
         mk.add(_btn(f"{em} {name}{tag}", f"lmnx_tool_{k}"))
     mk.add(_btn("◀️ SearchX 😈", "menu_lmnx"))
     return mk
@@ -5505,7 +5501,7 @@ def register_handlers(bot_instance):
                 txt = (
                     "😈 <b>SearchX</b>\n"
                     "━━━━━━━━━━━━━━━━━━━━━\n"
-                    "🤖 AI: <b>ÜCRETSİZ</b>\n"
+                    "🤖 AI Studio: <b>Premium</b>\n"
                     + (f"⭐ Premium: <b>Aktif</b> ({left})\n" if prem else
                        f"💎 Paketler: {SEARCHX_PRICE_DAY}⭐/gün · {SEARCHX_PRICE_WEEK}⭐/hafta · {SEARCHX_PRICE_MONTH}⭐/ay\n"
                        "♾️ Ömür boyu: @hackledin\n")
@@ -5548,7 +5544,7 @@ def register_handlers(bot_instance):
                 cat = data.replace("lmnx_cat_", "", 1)
                 if cat not in LMNX_CATS:
                     return
-                if cat != "ai" and uid != ADMIN_ID and not is_premium_lmnx(uid):
+                if uid != ADMIN_ID and not is_premium_lmnx(uid):
                     try:
                         bot_instance.answer_callback_query(
                             call.id,
