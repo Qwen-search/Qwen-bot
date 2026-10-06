@@ -60,6 +60,11 @@ SEARCHX_PRICE_WEEK  = 400
 SEARCHX_PRICE_MONTH = 1000
 LMNX_PRICE = SEARCHX_PRICE_MONTH  # geriye uyumluluk
 
+# SearchX AI endpoints
+HACKER_GPT_URL = "https://dark-ai.lmnx9.workers.dev/?sukhi="
+AI_3D_LOGO_URL = "https://3d-logo.lmnx9.workers.dev/?prompt="
+AI_VIDEO_URL   = "https://api.lmnx9.shop/ai/video.php?prompt="
+
 def lmnx_premium_text():
     return (
         "😈 <b>SearchX Premium</b>\n"
@@ -2577,7 +2582,7 @@ LMNX_APIS = {
     "lmnx_deep":     ("https://api.lmnx9.shop/search/deep.php?query={v}", "Deep Search", "Arama sorgusu:", "info", False),
     # AI (Free) — sadece LMNX > AI menusu
     "lmnx_hackergpt": ("https://dark-ai.lmnx9.workers.dev/?sukhi={v}", "Hacker GPT", "Mesajini yaz:", "ai", False),
-    "lmnx_3dlogo":    ("https://3d-logo.lmnx9.workers.dev/?prompt={v}", "3D Logo", "Logo prompt (EN):", "ai", True),
+    "lmnx_3dlogo":    ("https://3d-logo.lmnx9.workers.dev/?prompt={v}", "3D Logo", "Logo prompt (EN):", "ai", False),
     "lmnx_aivideo":   ("https://api.lmnx9.shop/ai/video.php?prompt={v}", "AI Video", "Video prompt:", "ai", False),
     # Tempmail
     "lmnx_mailc":    ("https://api.lmnx9.shop/tempmail/create.php", "TempMail Create", None, "mail", False),
