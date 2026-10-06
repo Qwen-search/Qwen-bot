@@ -3351,6 +3351,86 @@ def _get_python_exe(): return sys.executable
 # Kullanıcı adım durumları (next_step kaybolmasın diye)
 USER_STATES = {}  # user_id -> {"action": "addbot"|"php2py", ...}
 
+def clear_user_flow(bot_instance, user_id, chat_id=None):
+    """Onceki next_step ve state temizle (spam / kilit onleme)."""
+    try:
+        USER_STATES.pop(user_id, None)
+    except Exception:
+        pass
+    for cid in (chat_id, user_id):
+        if cid is None:
+            continue
+        try:
+            bot_instance.clear_step_handler_by_chat_id(cid)
+        except Exception:
+            pass
+
+
+def is_main_menu_text(text):
+    t = (text or "").strip()
+    if not t:
+        return False
+    low = t.lower()
+    keys = (
+        "araçlar", "araclar", "tools", "الأدوات",
+        "ana menü", "ana menu", "home",
+        "combo çek", "combo check", "combo",
+        "istatistik", "statistics",
+        "profil", "profile",
+        "lider", "leaderboard",
+        "api değiştir", "api",
+        "yardım", "yardim", "help",
+    )
+    return any(k in low for k in keys)
+
+
+def open_tools_menu(bot_instance, chat_id, user_id):
+    """Araçlar menusunu guvenli ac."""
+    clear_user_flow(bot_instance, user_id, chat_id)
+    kb = None
+    try:
+        kb = tools_kb(user_id)
+    except Exception as e:
+        print(f"[open_tools] tools_kb: {e}")
+    txt = "🛠 Kullanmak istediğin aracı seç:"
+    try:
+        txt = s(user_id, "select_op")
+    except Exception:
+        pass
+    try:
+        bot_instance.send_message(chat_id, txt, reply_markup=kb)
+    except Exception as e:
+        print(f"[open_tools] send: {e}")
+        try:
+            bot_instance.send_message(chat_id, "🛠 Araçlar", reply_markup=kb)
+        except Exception as e2:
+            print(f"[open_tools] fatal: {e2}")
+
+
+def register_step(bot_instance, msg, handler):
+    """next_step: ana menu tusunda iptal + menu ac."""
+    def _wrap(m):
+        try:
+            uid = m.from_user.id
+            text = (m.text or "").strip()
+            if is_main_menu_text(text):
+                clear_user_flow(bot_instance, uid, m.chat.id)
+                if any(x in text for x in ("Araçlar", "Araclar", "Tools", "الأدوات")) or "araç" in text.lower() or "arac" in text.lower():
+                    open_tools_menu(bot_instance, m.chat.id, uid)
+                return
+            handler(m)
+        except Exception as e:
+            print(f"[register_step] {e}")
+            try:
+                bot_instance.reply_to(m, f"⚠️ Islem hatasi, tekrar dene.")
+            except Exception:
+                pass
+    try:
+        bot_instance.register_next_step_handler(msg, _wrap)
+    except Exception as e:
+        print(f"[register_step] fail: {e}")
+
+
 def _load_registry():
     if not os.path.exists(BOT_REGISTRY_FILE): return {}
     try:
@@ -4327,7 +4407,7 @@ def _sms_step1_number(msg, bot_instance):
     if not (phone.isdigit() and len(phone) == 10):
         bot_instance.reply_to(msg, "❌ Geçersiz numara! 10 haneli olmalı (başında 0 olmadan).\nÖrnek: 5306524123"); return
     m = bot_instance.reply_to(msg, f"📱 Hedef: <code>{phone}</code>\n📧 Mail adresi girin (bilmiyorsanız - gönderin):")
-    bot_instance.register_next_step_handler(m, lambda m: _sms_step2_mail(m, phone, bot_instance))
+    register_step(bot_instance, m, lambda m: _sms_step2_mail(m, phone, bot_instance))
 
 def _sms_step2_mail(msg, phone, bot_instance):
     mail = msg.text.strip()
@@ -4825,7 +4905,7 @@ def _process_hotmail_file(msg, bot_instance):
             return
         m = bot_instance.reply_to(msg, f"✅ **{len(combo_list)}** satır bulundu.\n"
             f"⚙️ Thread sayısını girin (10-100):\nVarsayılan: 10")
-        bot_instance.register_next_step_handler(m, lambda m: _start_hotmail_scan_queue(m, combo_list, bot_instance))
+        register_step(bot_instance, m, lambda m: _start_hotmail_scan_queue(m, combo_list, bot_instance))
     except Exception as e:
         bot_instance.reply_to(msg, f"❌ Dosya okunamadı: {e}")
 
@@ -4998,7 +5078,7 @@ def register_handlers(bot_instance):
         if enforce_ban(uid):
             bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML"); return
         m = bot_instance.reply_to(msg, s(uid, "video_ask"))
-        bot_instance.register_next_step_handler(m, lambda m: _process_video(m, bot_instance))
+        register_step(bot_instance, m, lambda m: _process_video(m, bot_instance))
 
     @bot_instance.message_handler(commands=["smsbomb","sms"])
     def cmd_smsbomb(msg):
@@ -5015,7 +5095,7 @@ def register_handlers(bot_instance):
                 return
         m = bot_instance.reply_to(msg,
             "💣 <b>SMS Bomber</b>\n📱 Hedef numarayı girin (10 haneli, başında 0 olmadan):\nÖrnek: <code>5306524123</code>")
-        bot_instance.register_next_step_handler(m, lambda m: _sms_step1_number(m, bot_instance))
+        register_step(bot_instance, m, lambda m: _sms_step1_number(m, bot_instance))
 
     @bot_instance.message_handler(commands=["smsstop"])
     def cmd_smsstop(msg):
@@ -5248,14 +5328,9 @@ def register_handlers(bot_instance):
             return (keys.get(k) or "").strip()
         if txt == _mk("combo") or txt.endswith("Combo Çek") or txt.endswith("Combo Check"):
             m = bot_instance.reply_to(msg, s(uid, "combo_ask"))
-            bot_instance.register_next_step_handler(m, lambda m: _process_combo(m, bot_instance))
-        elif txt == _mk("tools") or "Araçlar" in txt or "Tools" in txt or "الأدوات" in txt:
-            clear_user_flow(bot_instance, uid, msg.chat.id)
-            try:
-                bot_instance.reply_to(msg, s(uid, "select_op"), reply_markup=tools_kb(uid))
-            except Exception as e:
-                print(f"[TOOLS KB] {e}")
-                bot_instance.reply_to(msg, "🛠 Araçlar", reply_markup=tools_kb(uid))
+            register_step(bot_instance, m, lambda m: _process_combo(m, bot_instance))
+        elif txt == _mk("tools") or "Araçlar" in txt or "Araclar" in txt or "Tools" in txt or "الأدوات" in txt or "araç" in txt.lower():
+            open_tools_menu(bot_instance, msg.chat.id, uid)
         elif txt == _mk("stats") or "İstatistik" in txt or "Statistics" in txt:
             _show_stats(msg.chat.id, uid, bot_instance)
         elif txt == _mk("profile") or "Profil" in txt or "Profile" in txt:
@@ -5357,19 +5432,11 @@ def register_handlers(bot_instance):
                 return
 
             if data == "goto_tools":
-                clear_user_flow(bot_instance, uid, call.message.chat.id)
-                _ack()
-                txt = s(uid, "select_op")
                 try:
-                    if mid is not None:
-                        bot_instance.edit_message_text(txt, cid, mid, reply_markup=tools_kb(uid))
-                    else:
-                        raise Exception("no mid")
+                    bot_instance.answer_callback_query(call.id)
                 except Exception:
-                    try:
-                        bot_instance.send_message(cid, txt, reply_markup=tools_kb(uid))
-                    except Exception as e:
-                        print(f"[TOOLS] {e}")
+                    pass
+                open_tools_menu(bot_instance, call.message.chat.id, uid)
                 return
             if data == "menu_turkey":
                 try: bot_instance.answer_callback_query(call.id)
@@ -5473,7 +5540,7 @@ def register_handlers(bot_instance):
                         "💀 <b>Hacker GPT</b>\nNe istersen yaz.\n<i>bitir = kapat</i>",
                         parse_mode="HTML",
                     )
-                    bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                    register_step(bot_instance, m, lambda m: _process_hackergpt(m, bot_instance))
                     return
                 if key == "lmnx_3dlogo":
                     USER_STATES[uid] = {"action": "ai_3dlogo"}
@@ -5482,7 +5549,7 @@ def register_handlers(bot_instance):
                         "🎨 <b>3D Logo</b>\nPrompt yaz (EN daha iyi):\n<code>neon skull logo</code>",
                         parse_mode="HTML",
                     )
-                    bot_instance.register_next_step_handler(m, lambda m: _process_3dlogo(m, bot_instance))
+                    register_step(bot_instance, m, lambda m: _process_3dlogo(m, bot_instance))
                     return
                 if key == "lmnx_aivideo":
                     USER_STATES[uid] = {"action": "ai_video"}
@@ -5491,7 +5558,7 @@ def register_handlers(bot_instance):
                         "🎬 <b>AI Video</b>\nPrompt yaz:\n<code>hacker in dark room</code>",
                         parse_mode="HTML",
                     )
-                    bot_instance.register_next_step_handler(m, lambda m: _process_aivideo(m, bot_instance))
+                    register_step(bot_instance, m, lambda m: _process_aivideo(m, bot_instance))
                     return
                 if key == "lmnx_mailc" or prompt is None:
                     sm = bot_instance.send_message(call.message.chat.id, f"⏳ {name}...")
@@ -5503,7 +5570,7 @@ def register_handlers(bot_instance):
                     f"🛠 <b>{name}</b>\n{prompt}\n<i>iptal yazarak cik</i>",
                     parse_mode="HTML",
                 )
-                bot_instance.register_next_step_handler(m, lambda m, k=key: _process_lmnx_step(m, k, bot_instance))
+                register_step(bot_instance, m, lambda m, k=key: _process_lmnx_step(m, k, bot_instance))
                 return
             if data == "buy_lmnx":
                 clear_user_flow(bot_instance, uid, call.message.chat.id)
@@ -5539,7 +5606,7 @@ def register_handlers(bot_instance):
                     pass
                 USER_STATES[uid] = {"action": "hackergpt_chat"}
                 m = bot_instance.send_message(call.message.chat.id, "💀 <b>Hacker GPT</b>\nYaz:", parse_mode="HTML")
-                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_hackergpt(m, bot_instance))
                 return
             if data == "hackergpt_continue":
                 clear_user_flow(bot_instance, uid, call.message.chat.id)
@@ -5549,7 +5616,7 @@ def register_handlers(bot_instance):
                     pass
                 USER_STATES[uid] = {"action": "hackergpt_chat"}
                 m = bot_instance.send_message(call.message.chat.id, "💬 Yaz:")
-                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_hackergpt(m, bot_instance))
                 return
             if data == "hackergpt_end":
                 clear_user_flow(bot_instance, uid, call.message.chat.id)
@@ -5567,7 +5634,7 @@ def register_handlers(bot_instance):
                     pass
                 USER_STATES[uid] = {"action": "ai_3dlogo"}
                 m = bot_instance.send_message(call.message.chat.id, "🎨 Prompt yaz:")
-                bot_instance.register_next_step_handler(m, lambda m: _process_3dlogo(m, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_3dlogo(m, bot_instance))
                 return
             if data == "tool_aivideo":
                 clear_user_flow(bot_instance, uid, call.message.chat.id)
@@ -5577,7 +5644,7 @@ def register_handlers(bot_instance):
                     pass
                 USER_STATES[uid] = {"action": "ai_video"}
                 m = bot_instance.send_message(call.message.chat.id, "🎬 Prompt yaz:")
-                bot_instance.register_next_step_handler(m, lambda m: _process_aivideo(m, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_aivideo(m, bot_instance))
                 return
             if data == "buy_premium":
                 if is_premium(uid):
@@ -5663,7 +5730,7 @@ def register_handlers(bot_instance):
                     "📌 Örnek: <code>netflix.com</code>",
                     parse_mode="HTML"
                 )
-                bot_instance.register_next_step_handler(m, lambda m: log_process(m, bot_instance))
+                register_step(bot_instance, m, lambda m: log_process(m, bot_instance))
                 return
             # ═══ 🆔 TG-ID CALLBACK'LERİ ═══
             if data == "tool_tgid":
@@ -5693,7 +5760,7 @@ def register_handlers(bot_instance):
                     "📡 Kaynak: Sherlock\n"
                     "<i>İptal için: iptal</i>",
                     parse_mode="HTML")
-                bot_instance.register_next_step_handler(m, lambda m: tgid_process_search(m, bot_instance))
+                register_step(bot_instance, m, lambda m: tgid_process_search(m, bot_instance))
                 return
             if data == "tgid_packages":
                 try: bot_instance.answer_callback_query(call.id)
@@ -5759,13 +5826,13 @@ def register_handlers(bot_instance):
                     "📌 <code>@durov</code> · <code>777000</code>\n"
                     "<i>İptal: iptal</i>",
                     parse_mode="HTML")
-                bot_instance.register_next_step_handler(m, lambda m: tgid_process_search(m, bot_instance))
+                register_step(bot_instance, m, lambda m: tgid_process_search(m, bot_instance))
                 return
             if data == "__accid_search_disabled__":
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 m = bot_instance.send_message(call.message.chat.id, "🔍 <b>Account ID gir:</b>\n<i>İptal için <code>iptal</code></i>", parse_mode="HTML")
-                bot_instance.register_next_step_handler(m, lambda m: _process_accid_search(m, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_accid_search(m, bot_instance))
                 return
 
             if data == "accid_packages":
@@ -5849,7 +5916,7 @@ def register_handlers(bot_instance):
                     "İngilizce prompt yaz:\n\n"
                     "📌 <b>Örnek:</b>\n<code>beautiful landscape, mountains, sunset, 8k detailed</code>",
                     parse_mode="HTML")
-                bot_instance.register_next_step_handler(m, lambda m: aiimg_process(m, bot_instance, is_nsfw=False))
+                register_step(bot_instance, m, lambda m: aiimg_process(m, bot_instance, is_nsfw=False))
                 return
             if data == "aiimg_nsfw":
                 try: bot_instance.answer_callback_query(call.id)
@@ -5859,7 +5926,7 @@ def register_handlers(bot_instance):
                     "⚠️ Sadece yetişkin içerik!\nİngilizce prompt yaz:\n\n"
                     "📌 <b>Örnek:</b>\n<code>sexy woman, lingerie, bedroom, detailed</code>",
                     parse_mode="HTML")
-                bot_instance.register_next_step_handler(m, lambda m: aiimg_process(m, bot_instance, is_nsfw=True))
+                register_step(bot_instance, m, lambda m: aiimg_process(m, bot_instance, is_nsfw=True))
                 return
             if data == "aiimg_packages":
                 try: bot_instance.answer_callback_query(call.id)
@@ -5948,7 +6015,7 @@ def register_handlers(bot_instance):
                         f"⚡ **Normal Mod Seçildi**\n📱 Hedef: <code>{phone}</code>\n"
                         f"🔢 Limit gir (Sonsuz için 0):\n⏱ Aralık gir (saniye):\n"
                         f"Örnek: <code>50 2</code>")
-                    bot_instance.register_next_step_handler(m, lambda m: _sms_normal_settings(m, phone, mail, bot_instance))
+                    register_step(bot_instance, m, lambda m: _sms_normal_settings(m, phone, mail, bot_instance))
                 else:
                     _launch_sms_bomb(uid, phone, mail, "turbo", None, 0, bot_instance)
                     try: bot_instance.answer_callback_query(call.id, "🚀 Turbo mod başlatıldı!")
@@ -5990,7 +6057,7 @@ def register_handlers(bot_instance):
                         return
                 m = bot_instance.send_message(call.message.chat.id,
                     "💣 <b>SMS Bomber</b>\n📱 Hedef numarayı girin:\nÖrnek: <code>5306524123</code>")
-                bot_instance.register_next_step_handler(m, lambda m: _sms_step1_number(m, bot_instance))
+                register_step(bot_instance, m, lambda m: _sms_step1_number(m, bot_instance))
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 return
@@ -6024,7 +6091,7 @@ def register_handlers(bot_instance):
                     f"🔖 Keyword Limit: {get_keyword_limit_text(uid)}\n"
                     f"{'⭐ Premium' if is_prem else '🆓 Free'}\n"
                     f"Lütfen combo dosyasını (email:password) gönderin.")
-                bot_instance.register_next_step_handler(m, lambda m: _process_hotmail_file(m, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_hotmail_file(m, bot_instance))
                 return
             if data == "hotmail_addkw":
                 if not can_add_keyword(uid):
@@ -6036,7 +6103,7 @@ def register_handlers(bot_instance):
                 m = bot_instance.send_message(call.message.chat.id,
                     f"➕ **Keyword Ekle**\nMevcut: {', '.join(get_user_keywords(uid))}\n"
                     f"Limit: {get_keyword_limit_text(uid)}\nEklemek istediğin keyword'ü yaz:")
-                bot_instance.register_next_step_handler(m, lambda m: _process_add_keyword(m, bot_instance, uid))
+                register_step(bot_instance, m, lambda m: _process_add_keyword(m, bot_instance, uid))
                 return
             if data == "hotmail_delkw":
                 try: bot_instance.answer_callback_query(call.id)
@@ -6044,7 +6111,7 @@ def register_handlers(bot_instance):
                 m = bot_instance.send_message(call.message.chat.id,
                     f"🗑️ **Keyword Sil**\nMevcut: {', '.join(get_user_keywords(uid))}\n"
                     f"Silmek istediğin keyword'ü yaz:")
-                bot_instance.register_next_step_handler(m, lambda m: _process_del_keyword(m, bot_instance, uid))
+                register_step(bot_instance, m, lambda m: _process_del_keyword(m, bot_instance, uid))
                 return
             if data == "hotmail_resetkw":
                 set_user_keywords(uid, ["tiktok","instagram","netflix"])
@@ -6084,7 +6151,7 @@ def register_handlers(bot_instance):
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 m = bot_instance.send_message(call.message.chat.id, "📸 **Tüm Platformlar**\nLütfen combo dosyasını gönderin.")
-                bot_instance.register_next_step_handler(m, lambda m: _process_capture_file(m, bot_instance, None))
+                register_step(bot_instance, m, lambda m: _process_capture_file(m, bot_instance, None))
                 return
             if data.startswith("capture_"):
                 try:
@@ -6095,14 +6162,14 @@ def register_handlers(bot_instance):
                         except: pass
                         m = bot_instance.send_message(call.message.chat.id,
                             f"📸 **{platform_name} Seçildi**\nLütfen combo dosyasını gönderin.")
-                        bot_instance.register_next_step_handler(m, lambda m: _process_capture_file(m, bot_instance, target_app))
+                        register_step(bot_instance, m, lambda m: _process_capture_file(m, bot_instance, target_app))
                 except: pass
                 return
             if data.startswith("tool_"):
                 key = data[5:]
                 if key == "video":
                     m = bot_instance.send_message(call.message.chat.id, s(uid, "video_ask"))
-                    bot_instance.register_next_step_handler(m, lambda m: _process_video(m, bot_instance))
+                    register_step(bot_instance, m, lambda m: _process_video(m, bot_instance))
                 elif key == "predunyam":
                     _run_predunyam(call.message.chat.id, uid, bot_instance)
                 elif key == "php2py":
@@ -6122,11 +6189,11 @@ def register_handlers(bot_instance):
                 elif key in ("proxycheck","urlscan"):
                     prompt = TOOL_PROMPTS.get(lang(uid), TOOL_PROMPTS["tr"]).get(key)
                     m = bot_instance.send_message(call.message.chat.id, prompt)
-                    bot_instance.register_next_step_handler(m, lambda m: _process_special_tool(m, key, bot_instance))
+                    register_step(bot_instance, m, lambda m: _process_special_tool(m, key, bot_instance))
                 elif key in TOOLS_API:
                     prompt = TOOL_PROMPTS.get(lang(uid), TOOL_PROMPTS["tr"]).get(key)
                     m = bot_instance.send_message(call.message.chat.id, prompt)
-                    bot_instance.register_next_step_handler(m, lambda m: _process_generic_tool(m, key, bot_instance))
+                    register_step(bot_instance, m, lambda m: _process_generic_tool(m, key, bot_instance))
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 return
@@ -6134,7 +6201,7 @@ def register_handlers(bot_instance):
                 key = data[3:]
                 prompt = TURKEY_PROMPTS.get(lang(uid), TURKEY_PROMPTS["tr"]).get(key, s(uid, "enter_val"))
                 m = bot_instance.send_message(call.message.chat.id, s(uid, "tr_ask", prompt=prompt))
-                bot_instance.register_next_step_handler(m, lambda m: _process_turkey(m, key, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_turkey(m, key, bot_instance))
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 return
@@ -6148,7 +6215,7 @@ def register_handlers(bot_instance):
                 m = bot_instance.send_message(call.message.chat.id,
                     s(uid, "ls_ask", icon=info.get("icon","🔍"),
                       tool=info.get(lang(uid), info.get("tr", key))))
-                bot_instance.register_next_step_handler(m, lambda m: _process_ls(m, key, bot_instance))
+                register_step(bot_instance, m, lambda m: _process_ls(m, key, bot_instance))
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
                 return
@@ -6792,7 +6859,7 @@ def _process_hackergpt(msg, bot_instance):
         # sohbet devam
         USER_STATES[uid] = {"action": "hackergpt_chat"}
         try:
-            bot_instance.register_next_step_handler(msg, lambda m: _process_hackergpt(m, bot_instance))
+            register_step(bot_instance, msg, lambda m: _process_hackergpt(m, bot_instance))
         except Exception:
             pass
     except Exception as e:
@@ -7562,13 +7629,13 @@ def _handle_admin_cb(call, action, bot_instance):
             return
         elif action == "tgid_give":
             m = bot_instance.send_message(cid, "🆔 <b>TG-ID Bakiye Ver</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 50</code>")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_tgid_give(m, bot_instance))
+            register_step(bot_instance, m, lambda m: _admin_tgid_give(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
             return
         elif action == "tgid_take":
             m = bot_instance.send_message(cid, "➖ <b>TG-ID Bakiye Al</b>\nFormat: <code>USER_ID MIKTAR</code>\nÖrnek: <code>123456789 10</code>")
-            bot_instance.register_next_step_handler(m, lambda m: _admin_tgid_take(m, bot_instance))
+            register_step(bot_instance, m, lambda m: _admin_tgid_take(m, bot_instance))
             try: bot_instance.answer_callback_query(call.id)
             except: pass
             return
