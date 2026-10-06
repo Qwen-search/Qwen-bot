@@ -5348,6 +5348,7 @@ def register_handlers(bot_instance):
                 return
 
             if data == "goto_tools":
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
                 _ack()
                 txt = s(uid, "select_op")
                 try:
@@ -5372,56 +5373,51 @@ def register_handlers(bot_instance):
                     bot_instance.answer_callback_query(call.id)
                 except Exception:
                     pass
-                # Admin: tam erisim | Normal kullanici: bakim mesaji
-                if uid != ADMIN_ID:
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
+                # Bakim: normal kullanici sadece AI; admin tam menu
+                if uid != ADMIN_ID and not is_premium_lmnx(uid):
                     mk = InlineKeyboardMarkup(row_width=1)
+                    mk.add(_btn("🤖 AI 🆓", "lmnx_cat_ai"))
+                    mk.add(_btn(f"⭐ Premium Al ({LMNX_PRICE}⭐)", "buy_lmnx"))
                     mk.add(_btn("Geri", "goto_tools"))
                     txt = (
                         "<b>LMNX TOOLS</b>\n"
                         "━━━━━━━━━━━━━━━━━━━━━\n"
-                        "Bu servis su anda <b>bakimdadir</b>.\n"
-                        "Lutfen daha sonra tekrar deneyin."
+                        "🤖 AI araclar: <b>ucretsiz</b>\n"
+                        "Diger araclar su an <b>bakimda</b> / premium."
                     )
                     try:
-                        bot_instance.edit_message_text(
-                            txt, call.message.chat.id, call.message.message_id,
-                            reply_markup=mk, parse_mode="HTML"
-                        )
+                        bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=mk, parse_mode="HTML")
                     except Exception:
-                        bot_instance.send_message(
-                            call.message.chat.id, txt, reply_markup=mk, parse_mode="HTML"
-                        )
+                        bot_instance.send_message(call.message.chat.id, txt, reply_markup=mk, parse_mode="HTML")
                     return
                 txt = (
-                    "<b>LMNX TOOLS</b> (Admin)\n"
+                    "<b>LMNX TOOLS</b>\n"
                     "━━━━━━━━━━━━━━━━━━━━━\n"
-                    "Network · Crypto · Info · TempMail\n"
-                    f"Premium: {LMNX_PRICE} yildiz\n\n"
+                    "🤖 AI: ucretsiz\n"
+                    f"Digerleri: Premium {LMNX_PRICE} yildiz\n\n"
                     "Kategori sec:"
                 )
                 try:
-                    bot_instance.edit_message_text(
-                        txt, call.message.chat.id, call.message.message_id,
-                        reply_markup=lmnx_main_kb(uid), parse_mode="HTML"
-                    )
+                    bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
                 except Exception:
-                    bot_instance.send_message(
-                        call.message.chat.id, txt, reply_markup=lmnx_main_kb(uid), parse_mode="HTML"
-                    )
+                    bot_instance.send_message(call.message.chat.id, txt, reply_markup=lmnx_main_kb(uid), parse_mode="HTML")
                 return
             if data.startswith("lmnx_cat_"):
-                if uid != ADMIN_ID:
-                    try:
-                        bot_instance.answer_callback_query(call.id, "Bu servis bakimdadir.", show_alert=True)
-                    except Exception:
-                        pass
-                    return
                 try:
                     bot_instance.answer_callback_query(call.id)
                 except Exception:
                     pass
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
                 cat = data.replace("lmnx_cat_", "", 1)
                 if cat not in LMNX_CATS:
+                    return
+                # Bakim: non-admin sadece ai
+                if cat != "ai" and uid != ADMIN_ID and not is_premium_lmnx(uid):
+                    try:
+                        bot_instance.answer_callback_query(call.id, "Bu kategori bakimda / premium.", show_alert=True)
+                    except Exception:
+                        pass
                     return
                 title, keys = LMNX_CATS[cat]
                 try:
@@ -5434,12 +5430,6 @@ def register_handlers(bot_instance):
                     bot_instance.send_message(call.message.chat.id, title, reply_markup=lmnx_cat_kb(uid, cat))
                 return
             if data.startswith("lmnx_tool_"):
-                if uid != ADMIN_ID:
-                    try:
-                        bot_instance.answer_callback_query(call.id, "Bu servis bakimdadir.", show_alert=True)
-                    except Exception:
-                        pass
-                    return
                 key = data.replace("lmnx_tool_", "", 1)
                 if key not in LMNX_APIS:
                     try:
@@ -5448,31 +5438,69 @@ def register_handlers(bot_instance):
                         pass
                     return
                 url_t, name, prompt, cat, free = LMNX_APIS[key]
+                if not lmnx_can_use(uid, key):
+                    try:
+                        bot_instance.answer_callback_query(call.id, "Premium / bakim", show_alert=True)
+                    except Exception:
+                        pass
+                    return
+                # non-admin non-ai blocked during bakim
+                if cat != "ai" and uid != ADMIN_ID and not is_premium_lmnx(uid):
+                    try:
+                        bot_instance.answer_callback_query(call.id, "Bakimda", show_alert=True)
+                    except Exception:
+                        pass
+                    return
                 try:
                     bot_instance.answer_callback_query(call.id)
                 except Exception:
                     pass
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
+                # AI ozel akislar
+                if key == "lmnx_hackergpt":
+                    USER_STATES[uid] = {"action": "hackergpt_chat"}
+                    m = bot_instance.send_message(
+                        call.message.chat.id,
+                        "💀 <b>Hacker GPT</b>\nNe istersen yaz.\n<i>bitir = kapat</i>",
+                        parse_mode="HTML",
+                    )
+                    bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                    return
+                if key == "lmnx_3dlogo":
+                    USER_STATES[uid] = {"action": "ai_3dlogo"}
+                    m = bot_instance.send_message(
+                        call.message.chat.id,
+                        "🎨 <b>3D Logo</b>\nPrompt yaz (EN daha iyi):\n<code>neon skull logo</code>",
+                        parse_mode="HTML",
+                    )
+                    bot_instance.register_next_step_handler(m, lambda m: _process_3dlogo(m, bot_instance))
+                    return
+                if key == "lmnx_aivideo":
+                    USER_STATES[uid] = {"action": "ai_video"}
+                    m = bot_instance.send_message(
+                        call.message.chat.id,
+                        "🎬 <b>AI Video</b>\nPrompt yaz:\n<code>hacker in dark room</code>",
+                        parse_mode="HTML",
+                    )
+                    bot_instance.register_next_step_handler(m, lambda m: _process_aivideo(m, bot_instance))
+                    return
                 if key == "lmnx_mailc" or prompt is None:
-                    sm = bot_instance.send_message(call.message.chat.id, f"{name}...", parse_mode="HTML")
+                    sm = bot_instance.send_message(call.message.chat.id, f"⏳ {name}...")
                     _process_lmnx(call.message, key, "", bot_instance, sm)
                     return
+                USER_STATES[uid] = {"action": f"lmnx_{key}"}
                 m = bot_instance.send_message(
                     call.message.chat.id,
-                    f"<b>{name}</b>\n{prompt}\n<i>Iptal: iptal</i>",
-                    parse_mode="HTML"
+                    f"🛠 <b>{name}</b>\n{prompt}\n<i>iptal yazarak cik</i>",
+                    parse_mode="HTML",
                 )
                 bot_instance.register_next_step_handler(m, lambda m, k=key: _process_lmnx_step(m, k, bot_instance))
                 return
             if data == "buy_lmnx":
-                if uid != ADMIN_ID:
-                    try:
-                        bot_instance.answer_callback_query(call.id, "Bu servis bakimdadir.", show_alert=True)
-                    except Exception:
-                        pass
-                    return
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
                 if is_premium_lmnx(uid):
                     try:
-                        bot_instance.answer_callback_query(call.id, "Zaten LMNX Premium!", show_alert=True)
+                        bot_instance.answer_callback_query(call.id, "Zaten premium!", show_alert=True)
                     except Exception:
                         pass
                     return
@@ -5487,33 +5515,60 @@ def register_handlers(bot_instance):
                         currency="XTR",
                         prices=prices,
                     )
-                    bot_instance.answer_callback_query(call.id, "Fatura gonderildi")
+                    bot_instance.answer_callback_query(call.id)
                 except Exception as e:
-                    bot_instance.answer_callback_query(call.id, f"Hata: {e}", show_alert=True)
+                    try:
+                        bot_instance.answer_callback_query(call.id, str(e)[:180], show_alert=True)
+                    except Exception:
+                        pass
                 return
-            if data == "menu_ls":
-                # eski LeakSights -> bakim / admin LMNX
+            if data == "tool_hackergpt":
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
                 try:
                     bot_instance.answer_callback_query(call.id)
                 except Exception:
                     pass
-                if uid != ADMIN_ID:
-                    mk = InlineKeyboardMarkup(row_width=1)
-                    mk.add(_btn("Geri", "goto_tools"))
-                    txt = "Bu servis su anda <b>bakimdadir</b>."
-                    try:
-                        bot_instance.edit_message_text(txt, call.message.chat.id, call.message.message_id, reply_markup=mk, parse_mode="HTML")
-                    except Exception:
-                        bot_instance.send_message(call.message.chat.id, txt, reply_markup=mk, parse_mode="HTML")
-                    return
+                USER_STATES[uid] = {"action": "hackergpt_chat"}
+                m = bot_instance.send_message(call.message.chat.id, "💀 <b>Hacker GPT</b>\nYaz:", parse_mode="HTML")
+                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                return
+            if data == "hackergpt_continue":
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
                 try:
-                    bot_instance.edit_message_text(
-                        "<b>LMNX TOOLS</b> (Admin)",
-                        call.message.chat.id, call.message.message_id,
-                        reply_markup=lmnx_main_kb(uid), parse_mode="HTML"
-                    )
+                    bot_instance.answer_callback_query(call.id)
                 except Exception:
-                    bot_instance.send_message(call.message.chat.id, "LMNX", reply_markup=lmnx_main_kb(uid))
+                    pass
+                USER_STATES[uid] = {"action": "hackergpt_chat"}
+                m = bot_instance.send_message(call.message.chat.id, "💬 Yaz:")
+                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
+                return
+            if data == "hackergpt_end":
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                bot_instance.send_message(call.message.chat.id, "Sohbet kapandi.")
+                return
+            if data == "tool_3dlogo":
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                USER_STATES[uid] = {"action": "ai_3dlogo"}
+                m = bot_instance.send_message(call.message.chat.id, "🎨 Prompt yaz:")
+                bot_instance.register_next_step_handler(m, lambda m: _process_3dlogo(m, bot_instance))
+                return
+            if data == "tool_aivideo":
+                clear_user_flow(bot_instance, uid, call.message.chat.id)
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                USER_STATES[uid] = {"action": "ai_video"}
+                m = bot_instance.send_message(call.message.chat.id, "🎬 Prompt yaz:")
+                bot_instance.register_next_step_handler(m, lambda m: _process_aivideo(m, bot_instance))
                 return
             if data == "buy_premium":
                 if is_premium(uid):
@@ -5751,70 +5806,6 @@ def register_handlers(bot_instance):
                 return
 
 
-            if data == "tool_hackergpt":
-                try:
-                    bot_instance.answer_callback_query(call.id)
-                except Exception:
-                    pass
-                USER_STATES[uid] = {"action": "hackergpt_chat"}
-                m = bot_instance.send_message(
-                    call.message.chat.id,
-                    "💀 <b>Hacker GPT</b>\n"
-                    "━━━━━━━━━━━━━━━━━━━━━\n"
-                    "Ne istersen yaz — kod, fikir, script...\n"
-                    "Sohbet gibi devam eder.\n"
-                    "<i>Bitirmek icin: bitir / iptal</i>",
-                    parse_mode="HTML",
-                )
-                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
-                return
-            if data == "hackergpt_continue":
-                try:
-                    bot_instance.answer_callback_query(call.id)
-                except Exception:
-                    pass
-                USER_STATES[uid] = {"action": "hackergpt_chat"}
-                m = bot_instance.send_message(call.message.chat.id, "💬 Devam et, yaz:")
-                bot_instance.register_next_step_handler(m, lambda m: _process_hackergpt(m, bot_instance))
-                return
-            if data == "hackergpt_end":
-                try:
-                    bot_instance.answer_callback_query(call.id)
-                except Exception:
-                    pass
-                USER_STATES.pop(uid, None)
-                bot_instance.send_message(call.message.chat.id, "Sohbet kapandi.")
-                return
-            if data == "tool_3dlogo":
-                try:
-                    bot_instance.answer_callback_query(call.id)
-                except Exception:
-                    pass
-                m = bot_instance.send_message(
-                    call.message.chat.id,
-                    "🎨 <b>3D Logo</b>\n"
-                    "Logo promptunu yaz (Ingilizce daha iyi):\n"
-                    "<code>cyber skull logo, neon green, dark background</code>\n"
-                    "<i>Iptal: iptal</i>",
-                    parse_mode="HTML",
-                )
-                bot_instance.register_next_step_handler(m, lambda m: _process_3dlogo(m, bot_instance))
-                return
-            if data == "tool_aivideo":
-                try:
-                    bot_instance.answer_callback_query(call.id)
-                except Exception:
-                    pass
-                m = bot_instance.send_message(
-                    call.message.chat.id,
-                    "🎬 <b>AI Video</b>\n"
-                    "Video promptunu yaz:\n"
-                    "<code>hacker typing in dark room, cinematic</code>\n"
-                    "<i>Iptal: iptal</i>",
-                    parse_mode="HTML",
-                )
-                bot_instance.register_next_step_handler(m, lambda m: _process_aivideo(m, bot_instance))
-                return
             if data == "tool_aiimg":
                 try: bot_instance.answer_callback_query(call.id)
                 except: pass
@@ -6941,6 +6932,11 @@ def _process_lmnx_step(msg, key, bot_instance):
         bot_instance.reply_to(msg, ban_block_message(uid), parse_mode="HTML")
         return
     text = (msg.text or "").strip()
+    # State eslesmezse eski handler - yoksay (spam onleme)
+    st = USER_STATES.get(uid) or {}
+    if st.get("action") not in (f"lmnx_{key}", None) and st.get("action") and not str(st.get("action","")).startswith("lmnx_"):
+        return
+    clear_user_flow(bot_instance, uid, msg.chat.id)
     if text.lower() in ("iptal", "cancel", "q"):
         bot_instance.reply_to(msg, "Iptal edildi.")
         return
@@ -6949,6 +6945,7 @@ def _process_lmnx_step(msg, key, bot_instance):
         return
     sm = bot_instance.reply_to(msg, "⏳ Sorgulanıyor...")
     _process_lmnx(msg, key, text, bot_instance, sm)
+
 
 
 def _process_lmnx(msg, key, text, bot_instance, sm=None):
@@ -6985,6 +6982,22 @@ def _process_lmnx(msg, key, text, bot_instance, sm=None):
             data = r.json()
         except Exception:
             data = {"result": body[:4000]} if body.strip() else None
+        if isinstance(data, dict) and data.get("error"):
+            err = str(data.get("error"))
+            if "too many" in err.lower() or "rate" in err.lower():
+                msg_err = "Cok fazla istek. Biraz bekleyip tekrar dene."
+            elif "trial" in err.lower():
+                msg_err = "API deneme suresi bitmis."
+            else:
+                msg_err = err
+            try:
+                if sm:
+                    bot_instance.edit_message_text(f"⚠️ {msg_err}", msg.chat.id, sm.message_id)
+                else:
+                    bot_instance.send_message(msg.chat.id, f"⚠️ {msg_err}")
+            except Exception:
+                pass
+            return
         data = _lmnx_sanitize(data)
         queried = (v + (" " + v2 if v2 else "")).strip()
         out = _lmnx_format_text(name, queried, data)
