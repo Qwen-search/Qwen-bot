@@ -2545,12 +2545,17 @@ LMNX_APIS = {
     "lmnx_ffban":    ("https://api.lmnx9.shop/ff/ban.php?uid={v}", "FF Ban Check", "Free Fire UID:", "info", False),
     "lmnx_darkweb":  ("https://api.lmnx9.shop/search/darkweb.php?search={v}", "Darkweb Search", "Arama terimi:", "info", False),
     "lmnx_deep":     ("https://api.lmnx9.shop/search/deep.php?query={v}", "Deep Search", "Arama sorgusu:", "info", False),
+    # AI (Free) — sadece LMNX > AI menusu
+    "lmnx_hackergpt": ("https://dark-ai.lmnx9.workers.dev/?sukhi={v}", "Hacker GPT", "Mesajini yaz:", "ai", True),
+    "lmnx_3dlogo":    ("https://3d-logo.lmnx9.workers.dev/?prompt={v}", "3D Logo", "Logo prompt (EN):", "ai", True),
+    "lmnx_aivideo":   ("https://api.lmnx9.shop/ai/video.php?prompt={v}", "AI Video", "Video prompt:", "ai", True),
     # Tempmail
     "lmnx_mailc":    ("https://api.lmnx9.shop/tempmail/create.php", "TempMail Create", None, "mail", False),
     "lmnx_mailk":    ("https://api.lmnx9.shop/tempmail/check.php?token={v}", "TempMail Check", "Token gir:", "mail", False),
 }
 
 LMNX_CATS = {
+    "ai":     ("🤖 AI", ["lmnx_hackergpt", "lmnx_3dlogo", "lmnx_aivideo"]),
     "net":    ("🌐 Network / Host", ["lmnx_sub","lmnx_dns","lmnx_ping","lmnx_http","lmnx_link","lmnx_whois","lmnx_ssl","lmnx_reverse","lmnx_port"]),
     "crypto": ("🔐 Encode / Crypto", ["lmnx_b64e","lmnx_b64d","lmnx_b85e","lmnx_b85d","lmnx_hexe","lmnx_hexd","lmnx_urle","lmnx_urld","lmnx_md5","lmnx_sha1","lmnx_sha256","lmnx_sha512","lmnx_crc32","lmnx_rot13","lmnx_rot47","lmnx_bine","lmnx_bind","lmnx_octe","lmnx_octd","lmnx_bcrypt","lmnx_bcryptv","lmnx_argon2","lmnx_argon2v","lmnx_hmac","lmnx_xor","lmnx_aescbc","lmnx_aesgcm","lmnx_hashid"]),
     "info":   ("📱 Info / Lookup", ["lmnx_tgch","lmnx_tgotp","lmnx_twitter","lmnx_truecaller","lmnx_tiktok","lmnx_bin","lmnx_imei","lmnx_ffinfo","lmnx_ffban","lmnx_darkweb","lmnx_deep"]),
@@ -2672,12 +2677,16 @@ def _lmnx_format_text(name, queried, data):
 
 
 def lmnx_can_use(user_id, key):
-    """Tum LMNX araclar premium (veya admin)."""
-    if key not in LMNX_APIS:
+    """AI ucretsiz; digerleri premium veya admin."""
+    info = LMNX_APIS.get(key)
+    if not info:
         return False
+    if info[4]:  # free_ai
+        return True
     if user_id == ADMIN_ID or is_premium_lmnx(user_id):
         return True
     return False
+
 
 
 def lmnx_main_kb(user_id):
@@ -2687,7 +2696,8 @@ def lmnx_main_kb(user_id):
     else:
         mk.add(_btn(f"⭐ LMNX Premium Al ({LMNX_PRICE}⭐)", "buy_lmnx"))
     for cat, (title, keys) in LMNX_CATS.items():
-        mk.add(_btn(title, f"lmnx_cat_{cat}"))
+        tag = " 🆓" if cat == "ai" else ""
+        mk.add(_btn(f"{title}{tag}", f"lmnx_cat_{cat}"))
     mk.add(_btn("◀️ Geri", "goto_tools"))
     return mk
 
@@ -2801,8 +2811,6 @@ def tools_kb(user_id):
     else:
         lmnx_txt = "LMNX Tools (Bakimda)"
     mk.add(_btn("🇹🇷 Türkiye Sorguları", "menu_turkey"), _btn(lmnx_txt, "menu_lmnx"))
-    mk.add(_btn("💀 Hacker GPT", "tool_hackergpt"), _btn("🎨 3D Logo", "tool_3dlogo"))
-    mk.add(_btn("🎬 AI Video", "tool_aivideo"))
     mk.add(
         _btn("🎮 MC Bedrock", "tool_bedrock"), _btn("💳 CC Generator", "tool_ccgen"),
         _btn("🤖 Discord Token", "tool_dctoken"), _btn("✈️ TG Token", "tool_tgtoken"),
@@ -5242,6 +5250,7 @@ def register_handlers(bot_instance):
             m = bot_instance.reply_to(msg, s(uid, "combo_ask"))
             bot_instance.register_next_step_handler(m, lambda m: _process_combo(m, bot_instance))
         elif txt == _mk("tools") or "Araçlar" in txt or "Tools" in txt or "الأدوات" in txt:
+            clear_user_flow(bot_instance, uid, msg.chat.id)
             try:
                 bot_instance.reply_to(msg, s(uid, "select_op"), reply_markup=tools_kb(uid))
             except Exception as e:
