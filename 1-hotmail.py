@@ -2718,6 +2718,16 @@ def lmnx_can_use(user_id, key):
 
 
 
+def searchx_admin_give_kb():
+    mk = InlineKeyboardMarkup(row_width=1)
+    mk.add(_btn("📅 1 Günlük", "adm_sx_pkg_1"))
+    mk.add(_btn("📆 1 Haftalık", "adm_sx_pkg_7"))
+    mk.add(_btn("🗓 1 Aylık", "adm_sx_pkg_30"))
+    mk.add(_btn("♾️ Ömür boyu", "adm_sx_pkg_0"))
+    mk.add(_btn("◀️ Kapat", "noop"))
+    return mk
+
+
 def searchx_packages_kb():
     mk = InlineKeyboardMarkup(row_width=1)
     mk.add(_btn(f"📅 1 Günlük — {SEARCHX_PRICE_DAY}⭐", "buy_sx_day"))
@@ -5199,7 +5209,7 @@ def register_handlers(bot_instance):
             _btn("📋 TG-ID Logları","adm_tgid_logs"),
             _btn("💰 TG-ID Satın Almalar","adm_tgid_purchases"),
             _btn("📂 LOG Premium Ver","adm_log_give"),
-            _btn("🛠 LMNX Premium Ver","adm_lmnx_give"),
+            _btn("😈 SearchX Premium Ver","adm_lmnx_give"),
             _btn("🎨 AI Image Bakiye Ver","adm_aiimg_give"),
             _btn("➖ AI Image Bakiye Al","adm_aiimg_take"),
             _btn("➖ TG-ID Bakiye Al","adm_tgid_take"),
@@ -5284,6 +5294,11 @@ def register_handlers(bot_instance):
             if action == "adm_lmnx_give":
                 USER_STATES.pop(uid, None)
                 _admin_lmnx_give_user(msg, bot_instance)
+                return
+            if action == "adm_sx_give":
+                days = st.get("days", 30)
+                USER_STATES.pop(uid, None)
+                _admin_sx_give_user(msg, bot_instance, days)
                 return
             if action == "adm_log_give":
                 USER_STATES.pop(uid, None)
@@ -5505,8 +5520,7 @@ def register_handlers(bot_instance):
                     + (f"⭐ Premium: <b>Aktif</b> ({left})\n" if prem else
                        f"💎 Paketler: {SEARCHX_PRICE_DAY}⭐/gün · {SEARCHX_PRICE_WEEK}⭐/hafta · {SEARCHX_PRICE_MONTH}⭐/ay\n"
                        "♾️ Ömür boyu: @hackledin\n")
-                    + "💳 CC Generator + BIN dahil\n\n"
-                    + "Kategori seç:"
+                    + "\nKategori seç:"
                 )
                 try:
                     bot_instance.edit_message_text(
@@ -5728,6 +5742,28 @@ def register_handlers(bot_instance):
                     "Bu paket yildiz ile satilmaz.\n"
                     "📩 Iletisim: <b>@hackledin</b>\n\n"
                     "Yaz: <code>SearchX omur boyu istiyorum</code>",
+                    parse_mode="HTML"
+                )
+                return
+            if data.startswith("adm_sx_pkg_"):
+                if uid != ADMIN_ID:
+                    return
+                try:
+                    bot_instance.answer_callback_query(call.id)
+                except Exception:
+                    pass
+                days_s = data.replace("adm_sx_pkg_", "")
+                try:
+                    days = int(days_s)
+                except Exception:
+                    days = 30
+                USER_STATES[uid] = {"action": "adm_sx_give", "days": days}
+                label = {1: "1 Günlük", 7: "1 Haftalık", 30: "1 Aylık", 0: "Ömür boyu"}.get(days, f"{days} gün")
+                bot_instance.send_message(
+                    call.message.chat.id,
+                    f"😈 <b>SearchX — {label}</b>\n"
+                    f"Kullanıcı ID veya @username gir:\n"
+                    f"<code>123456789</code>",
                     parse_mode="HTML"
                 )
                 return
@@ -7274,24 +7310,45 @@ def _process_lmnx(msg, key, text, bot_instance, sm=None):
 
 
 def _admin_lmnx_give_user(msg, bot_instance):
+    """Eski akis: varsayilan 30 gun."""
+    _admin_sx_give_user(msg, bot_instance, days=30)
+
+
+def _admin_sx_give_user(msg, bot_instance, days=30):
     if msg.from_user.id != ADMIN_ID:
         return
-    tid, tuname = _resolve_target(msg.text.strip())
+    tid, tuname = _resolve_target((msg.text or "").strip())
     if not tid:
-        bot_instance.reply_to(msg, "❌ Kullanici bulunamadi!")
+        bot_instance.reply_to(msg, "❌ Kullanici bulunamadi! ID veya @username gir.")
         return
     add_user(tid, tuname or "", "")
-    if is_premium_lmnx(tid):
-        bot_instance.reply_to(msg, f"ℹ️ @{tuname or tid} zaten LMNX Premium!")
-        return
-    if set_premium_lmnx(tid, tuname or str(tid)):
-        bot_instance.reply_to(msg, f"✅ LMNX Premium verildi!\n👤 @{tuname or tid}\n🆔 <code>{tid}</code>", parse_mode="HTML")
+    label = {1: "1 Günlük", 7: "1 Haftalık", 30: "1 Aylık", 0: "Ömür boyu"}.get(int(days), f"{days} gün")
+    # days=0 => omur boyu
+    d = None if int(days) == 0 else int(days)
+    if set_premium_lmnx(tid, tuname or str(tid), days=d, package_label=f"Admin SearchX {label}"):
+        left = searchx_premium_left(tid)
+        bot_instance.reply_to(
+            msg,
+            f"✅ <b>SearchX 😈 Premium verildi!</b>\n"
+            f"📦 Paket: <b>{label}</b>\n"
+            f"⏱ Süre: <b>{left}</b>\n"
+            f"👤 @{tuname or tid}\n"
+            f"🆔 <code>{tid}</code>",
+            parse_mode="HTML"
+        )
         try:
-            bot_instance.send_message(tid, f"🎁 Admin sana <b>SearchX 😈 Premium</b> verdi!\n🌐 Network · 🔐 Crypto · 📱 Intel · 💳 CC · 📧 Mail", parse_mode="HTML")
+            bot_instance.send_message(
+                tid,
+                f"🎁 Admin sana <b>SearchX 😈 Premium</b> verdi!\n"
+                f"📦 Paket: <b>{label}</b>\n"
+                f"⏱ Süre: <b>{left}</b>",
+                parse_mode="HTML"
+            )
         except Exception:
             pass
     else:
         bot_instance.reply_to(msg, "❌ Verilemedi.")
+
 
 
 def _process_turkey(msg, tool, bot_instance):
@@ -7658,8 +7715,18 @@ def _handle_admin_cb(call, action, bot_instance):
         elif action == "lmnx_give":
             try: bot_instance.answer_callback_query(call.id)
             except: pass
-            USER_STATES[uid] = {"action": "adm_lmnx_give"}
-            bot_instance.send_message(cid, "🛠 <b>LMNX Premium Ver</b>\nTelegram ID gir:\n<code>123456789</code>", parse_mode="HTML")
+            bot_instance.send_message(
+                cid,
+                "😈 <b>SearchX Premium Ver</b>\n"
+                "━━━━━━━━━━━━━━━━━━━━━\n"
+                "📅 1 Günlük\n"
+                "📆 1 Haftalık\n"
+                "🗓 1 Aylık\n"
+                "♾️ Ömür boyu\n\n"
+                "Paket seç:",
+                reply_markup=searchx_admin_give_kb(),
+                parse_mode="HTML"
+            )
             return
         elif action == "log_give":
 
