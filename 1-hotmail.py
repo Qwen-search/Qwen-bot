@@ -65,6 +65,58 @@ HACKER_GPT_URL = "https://dark-ai.lmnx9.workers.dev/?sukhi="
 AI_3D_LOGO_URL = "https://3d-logo.lmnx9.workers.dev/?prompt="
 AI_VIDEO_URL   = "https://api.lmnx9.shop/ai/video.php?prompt="
 
+# ── Hotmail / Capture ──
+FREE_CHECK_LIMIT = 50
+PREMIUM_CHECK_LIMIT = 5000
+KEYWORD_FREE_LIMIT = 3
+CAPTURE_FREE_LIMIT = 3
+SMS_COUNT = 41
+
+# ── LOG Çekme ──
+LOG_PRICE = 600
+LOG_FREE_LIMIT = 3
+LOG_FREE_MAX = 100
+
+# ── Telegram ID Sorgu ──
+TGID_FREE_LIMIT = 1
+TGID_PACKAGE_25 = 25
+TGID_PACKAGE_50 = 50
+TGID_PACKAGE_100 = 100
+TGID_PRICE_25 = 89
+TGID_PRICE_50 = 180
+TGID_PRICE_100 = 250
+TGID_API_BASE = "https://vectraenexploits.onlinee.bond/telegram.php?exploits="
+
+# ── Account ID ──
+SUPABASE_URL = "https://bxqwroqjcfkofqudxuwb.supabase.co"
+SUPABASE_KEY = "sb_publishable_9KqeC8AE03BsGp0U9UOJPA_7kiC1yAs"
+ACCID_FREE_LIMIT = 1
+ACCID_PACKAGE_25 = 25
+ACCID_PACKAGE_45 = 45
+ACCID_PACKAGE_95 = 95
+ACCID_PRICE_25 = 89
+ACCID_PRICE_45 = 150
+ACCID_PRICE_95 = 380
+
+# ── AI Image Generator ──
+AIIMG_FREE_LIMIT = 2
+AIIMG_PACKAGE_10 = 10
+AIIMG_PACKAGE_20 = 20
+AIIMG_PACKAGE_30 = 30
+AIIMG_PACKAGE_50 = 50
+AIIMG_PACKAGE_100 = 100
+AIIMG_PRICE_10 = 50
+AIIMG_PRICE_20 = 90
+AIIMG_PRICE_30 = 120
+AIIMG_PRICE_50 = 180
+AIIMG_PRICE_100 = 300
+AIIMG_API_URL = "https://api.xiaomiai.top/v1/images/generations"
+AIIMG_SOURCE_URL = "https://xiaomiai.top"
+AIIMG_FALLBACK_URL = "https://image.pollinations.ai/prompt/"
+AIIMG_SIZE = "1024x1024"
+AIIMG_WIDTH = 1024
+AIIMG_HEIGHT = 1024
+
 def lmnx_premium_text():
     return (
         "😈 <b>SearchX Premium</b>\n"
